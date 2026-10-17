@@ -47,6 +47,7 @@ holo/
 - `app/routers/quiz.py`: `/quizzes` (teachers create; students list, fetch and attempt). Students never receive `correct_index`.
 - `app/routers/dashboard.py`: `/dashboard/summary` (teachers only).
 - `app/services/llm.py`: AI providers: `echo` (dev placeholder, only repeats the question), `anthropic`, `ollama`, `lmstudio`, `openai_compatible`. Chosen with `LLM_PROVIDER`.
+- `app/routers/voice.py` and `app/services/stt.py`: `POST /voice/transcribe` turns a recording into text with faster-whisper (optional install: `requirements-voice.txt`; `WHISPER_*` settings). Missing install gives a 503 with instructions.
 - `app/services/rag.py`: wraps `holox_ai`. If the engine is missing or fails it returns no notes rather than crashing.
 - `tests/`: pytest suite (in-memory SQLite). Run from `backend/`.
 
@@ -65,6 +66,7 @@ holo/
 - Student tabs: Tutor, Quizzes. Teacher tabs: Overview, Tutor, Quizzes, New quiz.
 - Text from the server is always inserted with `textContent` (never `innerHTML`). Keep it that way.
 - The sign-in token lives in `sessionStorage`. System fonts only, so it works offline.
+- Voice: the Speak button records with `MediaRecorder` and posts to `/voice/transcribe`; spoken answers use the browser's `speechSynthesis` (no server). A speech failure must never discard a received answer.
 
 ### `avatar-unity/`
 
@@ -89,8 +91,8 @@ Open http://127.0.0.1:8000/ for the web app and http://127.0.0.1:8000/docs for t
 Run the tests:
 
 ```powershell
-cd backend ; python -m pytest        # 52 tests
-cd ..\ai-engine ; python -m pytest   # 24 tests
+cd backend ; python -m pytest        # backend tests
+cd ..\ai-engine ; python -m pytest   # engine tests
 ```
 
 Always run uvicorn from inside `backend/` with the venv active. Running it from the repo root, or with the system Python, gives "No module named uvicorn".
@@ -118,11 +120,11 @@ The tutor is deliberately in **open mode**: it answers any question, and course 
 
 ## Current status and ideas for next steps
 
-Done: backend (auth, tutor, quizzes, teacher stats), AI engine (BM25 notes search), multi-provider AI support, web app.
+Done: backend (auth, tutor, quizzes, teacher stats), AI engine (BM25 notes search), multi-provider AI support, web app, voice in (faster-whisper) and out (browser voices) in the web app.
 
 Not done yet, in no fixed order:
 
-- Voice in and out in English and Malayalam (speech to text, text to speech).
+- Better Malayalam voice: a good Malayalam speech model and a server-side text to speech voice (the browser route needs a Malayalam voice installed). The Unity avatar will need audio from the backend.
 - Unity avatar of Adi Shankaracharya and the Pepper's Ghost render.
 - Quiz generation from the notes.
 - Reading PDFs in the AI engine, and semantic (embedding) search.

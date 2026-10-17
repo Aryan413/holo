@@ -72,7 +72,7 @@ function describeError(data, status) {
   return `Something went wrong (error ${status}). Try again.`;
 }
 
-async function api(path, { method = "GET", json, form } = {}) {
+async function api(path, { method = "GET", json, form, formData } = {}) {
   const headers = {};
   const token = sessionStorage.getItem(TOKEN_KEY);
   if (token) headers.authorization = `Bearer ${token}`;
@@ -82,6 +82,8 @@ async function api(path, { method = "GET", json, form } = {}) {
     body = JSON.stringify(json);
   } else if (form) {
     body = new URLSearchParams(form);
+  } else if (formData) {
+    body = formData; // the browser sets the multipart header itself
   }
 
   let response;
@@ -102,6 +104,7 @@ async function api(path, { method = "GET", json, form } = {}) {
 const errorBox = (message) => h("p", { class: "error", role: "alert" }, message);
 
 function signOut(message = "") {
+  stopVoice();
   sessionStorage.removeItem(TOKEN_KEY);
   state = freshState();
   renderAuth("signin", message);
@@ -242,6 +245,7 @@ function renderApp() {
 }
 
 function go(view) {
+  stopVoice();
   state.view = view;
   if (view === "quizzes") { state.quiz = null; state.quizResult = null; state.answers = []; }
   renderApp();
@@ -255,7 +259,7 @@ function viewTutor(main) {
     h("summary", {}, "Your chats"),
     h("button", {
       class: "btn ghost", type: "button",
-      onclick: () => { state.chat = newChat(); paintTutor(); ui.input.focus(); },
+      onclick: () => { stopVoice(); state.chat = newChat(); paintTutor(); ui.input.focus(); },
     }, "New chat"),
     sessionsList,
   );
@@ -263,8 +267,13 @@ function viewTutor(main) {
   const meta = h("div", { class: "composer-meta" });
   const input = h("textarea", { rows: "2", maxlength: "4000", placeholder: "Ask a question", "aria-label": "Your question" });
   const send = h("button", { class: "btn", type: "submit" }, "Ask");
-  const form = h("form", { class: "composer" }, meta, h("div", { class: "composer-row" }, input, send));
-  Object.assign(ui, { sessionsList, transcript, meta, input, send });
+  const mic = canRecord()
+    ? h("button", { class: "btn ghost mic", type: "button", onclick: toggleRecording, "data-state": "idle" }, "Speak")
+    : null;
+  const voiceNote = h("p", { class: "hint voice-note", role: "status" });
+  const form = h("form", { class: "composer" }, meta, voiceOptions(),
+    h("div", { class: "composer-row" }, input, mic, send), voiceNote);
+  Object.assign(ui, { sessionsList, transcript, meta, input, send, mic, voiceNote, form });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -287,9 +296,11 @@ function viewTutor(main) {
 }
 
 function turnEl(turn) {
+  const body = h("div", { class: "body" }, turn.pending ? h("span", { class: "thinking" }, "Thinking…") : turn.text);
+  const canListen = turn.who === "tutor" && !turn.pending && canSpeak();
   return h("article", { class: `turn ${turn.who}` },
     h("div", { class: "who-label" }, turn.who === "you" ? "You" : "Mentora"),
-    h("div", { class: "body" }, turn.pending ? h("span", { class: "thinking" }, "Thinking…") : turn.text),
+    h("div", { class: "col" }, body, canListen && listenButton(turn.text)),
   );
 }
 
@@ -353,6 +364,7 @@ async function loadSessions() {
 }
 
 async function openSession(id) {
+  stopVoice();
   try {
     const session = await api(`/tutor/sessions/${id}`);
     state.chat = {
@@ -370,6 +382,7 @@ async function ask(text) {
   const chat = state.chat;
   chat.error = "";
   chat.busy = true;
+  stopSpeaking();
   chat.turns.push({ who: "you", text }, { who: "tutor", text: "", pending: true });
   paintTutor();
   try {
@@ -380,6 +393,10 @@ async function ask(text) {
     chat.id = reply.session_id;
     chat.turns[chat.turns.length - 1] = { who: "tutor", text: reply.reply };
     loadSessions();
+    if (voice.readAloud && state.chat === chat && state.view === "tutor") {
+      // Never let a speech problem throw away an answer that arrived fine.
+      try { speak(reply.reply, chat.language); } catch { say("Could not read the answer aloud on this device."); }
+    }
   } catch (problem) {
     chat.turns.splice(-2, 2); // drop the unanswered question; it goes back in the box to resend
     chat.error = problem.message;
@@ -388,6 +405,183 @@ async function ask(text) {
     chat.busy = false;
     if (state.chat === chat && state.view === "tutor" && ui.transcript.isConnected) paintTutor();
   }
+}
+
+/* ---------- voice: speak a question, hear the answer ---------- */
+
+const MAX_RECORDING_SECONDS = 60;
+const voice = {
+  readAloud: loadPref("mentora.readAloud", false),
+  sendAfter: loadPref("mentora.sendAfter", false),
+  phase: "idle", // idle | recording | transcribing
+  recorder: null, stream: null, chunks: [], timer: null, seconds: 0, discard: false,
+  listening: null, // the Listen button that is currently speaking
+};
+
+function loadPref(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : v === "1"; } catch { return fallback; }
+}
+function savePref(key, value) {
+  try { localStorage.setItem(key, value ? "1" : "0"); } catch { /* preferences just won't be remembered */ }
+}
+
+const canRecord = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+const canSpeak = () => "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+
+function voiceOptions() {
+  const option = (label, key, prop) => h("label", { class: "choice" },
+    h("input", {
+      type: "checkbox", checked: voice[prop],
+      onchange: (event) => { voice[prop] = event.target.checked; savePref(key, voice[prop]); if (!voice[prop]) stopSpeaking(); },
+    }),
+    h("span", {}, label));
+  const options = [];
+  if (canSpeak()) options.push(option("Read answers aloud", "mentora.readAloud", "readAloud"));
+  if (canRecord()) options.push(option("Send right after speaking", "mentora.sendAfter", "sendAfter"));
+  return h("div", { class: "composer-meta voice-options", hidden: options.length === 0 }, options);
+}
+
+function say(message) {
+  if (ui.voiceNote && ui.voiceNote.isConnected) ui.voiceNote.textContent = message;
+}
+
+/* --- spoken answers (the browser's own voices, no server needed) --- */
+
+function forSpeech(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, " code block. ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`#>~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pickVoice(language) {
+  const voices = window.speechSynthesis.getVoices();
+  if (language === "ml") return voices.find((v) => v.lang.toLowerCase().startsWith("ml")) || null;
+  return voices.find((v) => v.lang.toLowerCase() === "en-in")
+    || voices.find((v) => v.lang.toLowerCase().startsWith("en")) || null;
+}
+
+function stopSpeaking() {
+  if (canSpeak()) window.speechSynthesis.cancel();
+  if (voice.listening) { voice.listening.textContent = "Listen"; voice.listening = null; }
+}
+
+function speak(text, language, button) {
+  if (!canSpeak()) return;
+  stopSpeaking();
+  const voiceFound = pickVoice(language);
+  if (language === "ml" && !voiceFound) {
+    say("This computer has no Malayalam voice. Add one in Windows Settings, Time & language, Speech.");
+    return;
+  }
+  say("");
+  const utterance = new SpeechSynthesisUtterance(forSpeech(text));
+  utterance.lang = language === "ml" ? "ml-IN" : (voiceFound ? voiceFound.lang : "en-IN");
+  if (voiceFound) utterance.voice = voiceFound;
+  const done = () => { if (voice.listening === button) { button.textContent = "Listen"; voice.listening = null; } };
+  utterance.onend = done;
+  utterance.onerror = done;
+  if (button) { button.textContent = "Stop"; voice.listening = button; }
+  window.speechSynthesis.speak(utterance);
+}
+
+function listenButton(text) {
+  const button = h("button", { class: "link listen", type: "button" }, "Listen");
+  button.addEventListener("click", () => {
+    if (voice.listening === button) { stopSpeaking(); return; }
+    speak(text, state.chat.language, button);
+  });
+  return button;
+}
+
+/* --- spoken questions (recorded here, turned into text by the backend) --- */
+
+function paintMic() {
+  const mic = ui.mic;
+  if (!mic || !mic.isConnected) return;
+  mic.dataset.state = voice.phase;
+  mic.disabled = voice.phase === "transcribing";
+  mic.textContent = voice.phase === "recording"
+    ? `Stop ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")}`
+    : voice.phase === "transcribing" ? "Listening…" : "Speak";
+}
+
+async function toggleRecording() {
+  if (voice.phase === "recording") { voice.recorder.stop(); return; }
+  if (voice.phase !== "idle" || state.chat.busy) return;
+  stopSpeaking();
+  say("");
+  try {
+    voice.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    say("The microphone is blocked. Allow it with the lock icon next to the address, then try again.");
+    return;
+  }
+  voice.chunks = [];
+  voice.discard = false;
+  voice.recorder = new MediaRecorder(voice.stream);
+  voice.recorder.addEventListener("dataavailable", (event) => { if (event.data.size) voice.chunks.push(event.data); });
+  voice.recorder.addEventListener("stop", finishRecording);
+  voice.recorder.start();
+  voice.phase = "recording";
+  voice.seconds = 0;
+  voice.timer = setInterval(() => {
+    voice.seconds += 1;
+    if (voice.seconds >= MAX_RECORDING_SECONDS) voice.recorder.stop();
+    paintMic();
+  }, 1000);
+  paintMic();
+  say("Speak your question, then press Stop.");
+}
+
+function releaseMicrophone() {
+  clearInterval(voice.timer);
+  if (voice.stream) voice.stream.getTracks().forEach((track) => track.stop());
+  voice.stream = null;
+}
+
+async function finishRecording() {
+  releaseMicrophone();
+  const chat = state.chat;
+  const blob = new Blob(voice.chunks, { type: (voice.recorder && voice.recorder.mimeType) || "audio/webm" });
+  if (voice.discard) { voice.phase = "idle"; return; }
+  if (blob.size < 1500) {
+    voice.phase = "idle"; paintMic();
+    say("That was too short. Press Speak, say your question, then press Stop.");
+    return;
+  }
+  voice.phase = "transcribing";
+  paintMic();
+  say("Turning your voice into text…");
+  const data = new FormData();
+  data.append("audio", blob, "question.webm");
+  data.append("language", chat.language);
+  try {
+    const result = await api("/voice/transcribe", { method: "POST", formData: data });
+    if (ui.input && ui.input.isConnected && state.chat === chat) {
+      ui.input.value = ui.input.value.trim() ? `${ui.input.value.trim()} ${result.text}` : result.text;
+      say("");
+      if (voice.sendAfter) ui.form.requestSubmit(); else ui.input.focus();
+    }
+  } catch (problem) {
+    say(problem.message);
+  } finally {
+    voice.phase = "idle";
+    paintMic();
+  }
+}
+
+// Leaving the page or the tutor tab: stop talking and drop any recording in progress.
+function stopVoice() {
+  stopSpeaking();
+  if (voice.phase === "recording" && voice.recorder) {
+    voice.discard = true;
+    try { voice.recorder.stop(); } catch { /* already stopped */ }
+  }
+  releaseMicrophone();
+  if (voice.phase === "recording") voice.phase = "idle";
 }
 
 /* ---------- quizzes ---------- */

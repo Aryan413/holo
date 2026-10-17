@@ -207,6 +207,8 @@ main > h2 { margin-bottom: 1.25rem; }
 .turn { display: grid; grid-template-columns: 5.5rem minmax(0, 68ch); gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
 .who-label { color: var(--muted); font-size: .9rem; padding-top: .1rem; }
 .turn .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.turn .col { min-width: 0; }
+.listen { margin: .5rem 0 0 1rem; font-size: .9rem; }
 .turn.tutor .body {
   font-family: var(--serif);
   font-size: 1.0625rem;
@@ -224,12 +226,21 @@ main > h2 { margin-bottom: 1.25rem; }
 .composer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.5rem; color: var(--muted); font-size: .95rem; }
 .composer-row { display: flex; gap: .75rem; align-items: flex-end; }
 .composer-row textarea { flex: 1; min-height: 3.25rem; }
+.voice-note { min-height: 1.4rem; }
+.mic { min-width: 6.5rem; }
+.mic[data-state="recording"] { color: var(--bad); border-color: var(--bad); }
+.mic[data-state="recording"]::before {
+  content: ""; display: inline-block; width: .55rem; height: .55rem; margin-right: .5rem;
+  border-radius: 50%; background: var(--bad); animation: pulse 1.2s ease-in-out infinite;
+}
 
 @media (max-width: 760px) {
   .tutor { grid-template-columns: 1fr; height: auto; gap: 1rem; }
   .transcript { overflow: visible; }
   .turn { grid-template-columns: 1fr; gap: .25rem; }
   .composer { position: sticky; bottom: 0; padding-bottom: .75rem; }
+  .composer-row { flex-wrap: wrap; }
+  .composer-row textarea { flex-basis: 100%; }
 }
 
 /* ---------- quizzes ---------- */

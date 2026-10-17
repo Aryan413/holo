@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import Base, engine
-from .routers import auth, dashboard, quiz, tutor
+from .routers import auth, dashboard, quiz, tutor, voice
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -38,6 +38,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(tutor.router)
+app.include_router(voice.router)
 app.include_router(quiz.router)
 app.include_router(dashboard.router)
 
