@@ -1,0 +1,58 @@
+# --- Secrets (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+service-account*.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Python (backend, ai-engine) ---
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+instance/
+*.sqlite3
+*.db
+
+# --- Node (dashboard) ---
+node_modules/
+dist/
+build/
+.next/
+npm-debug.log*
+
+# --- Unity (avatar-unity) ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+*.csproj
+*.sln
+*.suo
+*.user
+*.pidb
+*.booproj
+*.unityproj
+*.apk
+*.aab
+
+# --- Large generated data ---
+vectorstore/
+chroma/
+*.faiss
