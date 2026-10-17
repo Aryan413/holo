@@ -3,6 +3,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_SECRET = "dev-only-insecure-secret-change-before-deploying"
 
+# Free local AI servers and where they listen by default.
+LOCAL_BASE_URLS = {
+    "ollama": "http://localhost:11434/v1",
+    "lmstudio": "http://localhost:1234/v1",
+}
+KNOWN_PROVIDERS = {"echo", "anthropic", "openai_compatible", *LOCAL_BASE_URLS}
+
 
 class Settings(BaseSettings):
     """All configuration comes from environment variables or a local .env file."""
@@ -24,10 +31,13 @@ class Settings(BaseSettings):
     # Folder of course notes the tutor searches. Empty = the ai-engine/notes folder.
     notes_dir: str = ""
 
-    # "echo" (offline, for development) or "anthropic"
+    # Which AI writes the tutor's answers:
+    #   echo, anthropic, ollama, lmstudio, openai_compatible  (see .env.example)
     llm_provider: str = "echo"
     llm_api_key: str = ""
-    llm_model: str = "claude-sonnet-5-5"
+    llm_model: str = ""  # required for local providers; anthropic defaults to claude-sonnet-5-5
+    llm_base_url: str = ""  # only needed for openai_compatible
+    llm_timeout_seconds: int = 120  # local models on a laptop CPU can be slow
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -37,6 +47,21 @@ class Settings(BaseSettings):
     def _reject_dev_secret_in_production(self):
         if self.environment == "production" and self.jwt_secret == DEV_SECRET:
             raise ValueError("JWT_SECRET must be set to a strong random value in production")
+        return self
+
+    @model_validator(mode="after")
+    def _check_llm_settings(self):
+        provider = self.llm_provider
+        if provider not in KNOWN_PROVIDERS:
+            raise ValueError(f"LLM_PROVIDER must be one of: {', '.join(sorted(KNOWN_PROVIDERS))}")
+        if provider == "anthropic" and not self.llm_api_key:
+            raise ValueError("LLM_PROVIDER=anthropic needs LLM_API_KEY")
+        if (provider in LOCAL_BASE_URLS or provider == "openai_compatible") and not self.llm_model:
+            raise ValueError(
+                f"LLM_PROVIDER={provider} needs LLM_MODEL (for Ollama, the name shown by `ollama list`)"
+            )
+        if provider == "openai_compatible" and not self.llm_base_url:
+            raise ValueError("LLM_PROVIDER=openai_compatible needs LLM_BASE_URL")
         return self
 
 

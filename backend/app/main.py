@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,10 +9,18 @@ from .database import Base, engine
 from .routers import auth, dashboard, quiz, tutor
 
 
+logger = logging.getLogger("uvicorn.error")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Fine for development. Switch to Alembic migrations before the schema starts changing.
     Base.metadata.create_all(bind=engine)
+    if settings.llm_provider == "echo":
+        logger.warning(
+            "LLM_PROVIDER=echo: tutor replies are placeholders. "
+            "Set LLM_PROVIDER in .env (ollama, lmstudio or anthropic) for real answers."
+        )
     yield
 
 

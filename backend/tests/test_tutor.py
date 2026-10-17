@@ -89,4 +89,14 @@ def test_ai_failure_returns_502_and_saves_nothing(client, make_user):
 
     r = client.post("/tutor/chat", json={"message": "hi"}, headers=headers)
     assert r.status_code == 502
+    assert "LLM_PROVIDER" in r.json()["detail"]  # tells the student's team what to check
+    assert client.get("/tutor/sessions", headers=headers).json() == []
+
+
+def test_empty_ai_answer_is_an_error_and_saves_nothing(client, make_user):
+    headers = make_user("s@example.com")
+    app.dependency_overrides[get_provider] = lambda: Recorder("   ")
+
+    r = client.post("/tutor/chat", json={"message": "hi"}, headers=headers)
+    assert r.status_code == 502
     assert client.get("/tutor/sessions", headers=headers).json() == []
