@@ -1,3 +1,6 @@
 # Optional: speech to text for the microphone button. Large download, so it is separate.
 -r requirements.txt
 faster-whisper
+# faster-whisper allows any av 11 or newer, but av 17+ breaks its audio reading
+# ("open() got an unexpected keyword argument 'metadata_errors'"). Tested with 16.1.
+av>=14,<17
