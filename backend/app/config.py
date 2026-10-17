@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
+    # Folder of course notes the tutor searches. Empty = the ai-engine/notes folder.
+    notes_dir: str = ""
+
     # "echo" (offline, for development) or "anthropic"
     llm_provider: str = "echo"
     llm_api_key: str = ""

@@ -38,7 +38,7 @@ On Mac/Linux use `source venv/bin/activate` and `cp .env.example .env`.
 
 ## Where the other parts plug in
 
-- **AI engine (RAG):** implement `retrieve()` in `app/services/rag.py`. The tutor already passes whatever it returns to the LLM as reference notes.
+- **AI engine (RAG):** already connected. `app/services/rag.py` calls the `holox_ai` package in `../ai-engine`, which searches the notes in `ai-engine/notes/` and hands the best matches to the LLM. `pip install -r requirements.txt` installs it (run from the `backend` folder). See `ai-engine/README.md` for adding notes. Point `NOTES_DIR` in `.env` at a different folder if you want.
 - **Real LLM answers:** set `LLM_PROVIDER=anthropic` and `LLM_API_KEY` in `.env`. Another vendor or a local model means adding a class in `app/services/llm.py`. The Anthropic provider is written but has not been run against the live API yet, so test it once with your key.
 - **Unity avatar / voice:** call `POST /tutor/chat` with the student's token and speak the `reply`. Send `"language": "ml"` for Malayalam.
 - **Dashboard:** read `GET /dashboard/summary` with a teacher token.
