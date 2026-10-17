@@ -72,3 +72,28 @@ If a setting is missing the server refuses to start and says which one. If the A
 - Set `TEACHER_SIGNUP_CODE` to something private, and move to PostgreSQL (`DATABASE_URL`).
 - Add Alembic migrations once the tables start changing. Right now they are created automatically on startup.
 - Add rate limiting on `/auth/login` and `/tutor/chat`, and serve over HTTPS.
+
+
+## Voice: speak a question, hear the answer
+
+The Tutor page has a **Speak** button and two options, *Read answers aloud* and *Send right after speaking*.
+
+- **Spoken answers** use the voices already on the computer (the browser's speech engine). Nothing to install.
+  For Malayalam the computer needs a Malayalam voice (Windows: Settings, Time & language, Speech).
+- **Spoken questions** are recorded in the browser and sent to `POST /voice/transcribe`, which turns them into text with
+  [faster-whisper](https://github.com/SYSTRAN/faster-whisper). It runs on your own machine, works offline after the first
+  download, and works in every browser (including Brave, which blocks the browser's built-in listening).
+
+Voice input is optional because it is a big download:
+
+```powershell
+pip install -r requirements-voice.txt
+```
+
+Restart the server. The first time someone presses Speak, the speech model downloads (needs internet, a few hundred MB for
+`small`). Settings in `.env`: `WHISPER_MODEL` (`tiny`, `base`, `small`, `medium`, `large-v3`), `WHISPER_DEVICE` (`cpu` or
+`cuda`), `WHISPER_COMPUTE_TYPE` (`int8` for cpu, `float16` for cuda). Use `small` to start. Malayalam needs `medium` or
+`large-v3` to be usable, and even then it is much weaker than English.
+
+Without the extra install the rest of the app works, and the Speak button shows a message saying what to install.
+The microphone only works on `http://127.0.0.1:8000` or `localhost` (or https), not on a plain network address.

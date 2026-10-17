@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     llm_base_url: str = ""  # only needed for openai_compatible
     llm_timeout_seconds: int = 120  # local models on a laptop CPU can be slow
 
+    # Speech to text for the microphone button (needs `pip install -r requirements-voice.txt`).
+    # Model sizes: tiny, base, small (default), medium, large-v3. Bigger = more accurate, slower,
+    # and the only realistic choice for Malayalam. Downloaded once on first use.
+    whisper_model: str = "small"
+    whisper_device: str = "cpu"  # "cuda" uses the NVIDIA graphics card (needs CUDA libraries)
+    whisper_compute_type: str = "int8"  # use "float16" with cuda
+    max_audio_mb: int = 10
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
