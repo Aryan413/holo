@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Folder of course notes the tutor searches. Empty = the ai-engine/notes folder.
     notes_dir: str = ""
 
+    # Folder with the web app (index.html). Empty = the repo's dashboard/ folder.
+    web_dir: str = ""
+
     # Which AI writes the tutor's answers:
     #   echo, anthropic, ollama, lmstudio, openai_compatible  (see .env.example)
     llm_provider: str = "echo"
