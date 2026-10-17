@@ -1,10 +1,8 @@
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import Base, engine
@@ -45,10 +43,3 @@ app.include_router(dashboard.router)
 @app.get("/health", tags=["meta"])
 def health():
     return {"status": "ok"}
-
-
-# The web app (dashboard/ folder) is served from the same address as the API, so
-# http://127.0.0.1:8000/ opens it. Mounted last so every API route above wins.
-WEB_DIR = Path(settings.web_dir) if settings.web_dir else Path(__file__).resolve().parents[2] / "dashboard"
-if (WEB_DIR / "index.html").is_file():
-    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
