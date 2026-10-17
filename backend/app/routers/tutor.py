@@ -10,7 +10,7 @@ from ..models import ChatMessage, ChatSession, User
 from ..schemas import ChatRequest, ChatResponse, SessionDetail, SessionOut
 from ..security import get_current_user
 from ..services.llm import LLMProvider, get_provider
-from ..services.rag import retrieve
+from ..services.rag import list_subjects, retrieve
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,12 @@ def chat(
     )
     db.commit()
     return ChatResponse(session_id=session.id, reply=reply)
+
+
+@router.get("/subjects", response_model=list[str])
+def subjects(_: User = Depends(get_current_user)):
+    """Subjects with course notes. "General" is always offered first."""
+    return ["General", *[s for s in list_subjects() if s != "General"]]
 
 
 @router.get("/sessions", response_model=list[SessionOut])

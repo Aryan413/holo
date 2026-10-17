@@ -19,11 +19,12 @@ See `notes/README.md`. In short: `notes/<Subject>/<topic>.md`, with `#` headings
 
 ```powershell
 cd ai-engine
-pip install -e .
+pip install -r requirements-dev.txt
 python -m holox_ai "What is Kirchhoff's current law?" --subject Physics
-pip install pytest
 pytest
 ```
+
+`requirements.txt` has no third-party packages (the engine is pure Python); it just installs `holox_ai` itself. `requirements-dev.txt` adds `pytest`.
 
 The backend installs this package itself (`pip install -r requirements.txt` inside `backend/`).
 
