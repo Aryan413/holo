@@ -30,15 +30,13 @@
   let w = 0;
   let h = 0;
   let fontPx = 15;
-  let colors = { ghost: "#9ed0e6", lamp: "#f0b95a" };
+  // the swarm's palette: blue, brass, violet, mint, coral, pink (set in styles.css)
+  let colors = ["#9ed0e6", "#f0b95a", "#c79bff", "#8ed6a8", "#ff9c8f", "#ff7ad9"];
   const pointer = { x: 0, y: 0, seen: -1e9 };
 
   function readColors() {
     const css = getComputedStyle(document.documentElement);
-    colors = {
-      ghost: css.getPropertyValue("--ghost").trim() || colors.ghost,
-      lamp: css.getPropertyValue("--lamp").trim() || colors.lamp,
-    };
+    colors = colors.map((fallback, n) => css.getPropertyValue(`--sw${n + 1}`).trim() || fallback);
   }
 
   function resize() {
@@ -99,9 +97,11 @@
   function drawStill() {
     ctx.clearRect(0, 0, w, h);
     setFont();
-    ctx.fillStyle = colors.ghost;
     ctx.globalAlpha = 0.22;
-    for (const b of bits) ctx.fillText(RAMP[1 + (b.i % 6)], b.x, b.y);
+    for (const b of bits) {
+      ctx.fillStyle = colors[b.i % colors.length];
+      ctx.fillText(RAMP[1 + (b.i % 6)], b.x, b.y);
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -178,7 +178,11 @@
       const idx = Math.round(swarmIdx * (1 - form) + globeIdx * form);
       const shade = (1 - form) + form * (0.3 + 0.7 * ((depth + 1) / 2));
       ctx.globalAlpha = clamp(base * shade, 0, 1);
-      ctx.fillStyle = speed > 140 && form < 0.5 ? colors.lamp : colors.ghost;
+      // swarm: every character keeps its own colour, and the fastest flare brass.
+      // globe: colours run in bands from top to bottom.
+      const swarmColor = speed > 140 ? colors[1] : colors[b.i % colors.length];
+      const globeColor = colors[Math.floor((b.i / COUNT) * colors.length)];
+      ctx.fillStyle = form < 0.5 ? swarmColor : globeColor;
       ctx.fillText(RAMP[clamp(idx, 1, 9)], b.x, b.y);
     }
     ctx.globalAlpha = 1;

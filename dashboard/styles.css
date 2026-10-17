@@ -17,10 +17,24 @@
   --ghost: #9ed0e6;
   --good: #8ed6a8;
   --bad: #ff9c8f;
+
+  /* colours of the background swarm (swarm.js reads these) */
+  --sw1: #9ed0e6;
+  --sw2: #f0b95a;
+  --sw3: #c79bff;
+  --sw4: #8ed6a8;
+  --sw5: #ff9c8f;
+  --sw6: #ff7ad9;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
+    --sw1: #1f6f93;
+    --sw2: #b7791f;
+    --sw3: #7a3fc7;
+    --sw4: #1b6b3a;
+    --sw5: #b3261e;
+    --sw6: #b0308f;
     --bg: #eef1f6;
     --panel: #ffffff;
     --raise: #e3e8f1;
