@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "holox-ai"
+version = "0.1.0"
+description = "HoloX AI engine: searches the course notes so the tutor can answer from them (RAG)"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["holox_ai*"]

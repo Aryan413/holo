@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -10,7 +12,14 @@ from ..security import get_current_user
 from ..services.llm import LLMProvider, get_provider
 from ..services.rag import retrieve
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/tutor", tags=["tutor"])
+
+AI_UNAVAILABLE = (
+    "The AI service could not be reached. Check LLM_PROVIDER, LLM_MODEL, LLM_BASE_URL and "
+    "LLM_API_KEY in .env, and that your AI server (for example Ollama) is running."
+)
 
 MAX_HISTORY = 20  # keep even so the history always starts with a user message
 
@@ -60,9 +69,12 @@ def chat(
 
     try:
         reply = llm.generate(system, messages)
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
         # Nothing has been committed yet, so a failed AI call leaves no half-saved chat.
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "AI service unavailable")
+        logger.warning("AI call failed: %s", exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, AI_UNAVAILABLE)
+    if not reply.strip():
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The AI returned an empty answer")
 
     db.add_all(
         [
