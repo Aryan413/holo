@@ -18,6 +18,17 @@ except ImportError:  # engine not installed: run `pip install -r requirements.tx
     logger.warning("holox_ai is not installed; the tutor will answer without course notes")
 
 
+def list_subjects() -> list[str]:
+    """Subjects that have course notes (the folder names inside the notes folder)."""
+    if get_retriever is None:
+        return []
+    try:
+        return get_retriever(settings.notes_dir or None).subjects()
+    except Exception:
+        logger.exception("Could not list subjects")
+        return []
+
+
 def retrieve(subject: str, query: str, k: int = 4) -> list[str]:
     """Return up to k relevant note snippets, best first. Returns [] when nothing matches."""
     if get_retriever is None:
