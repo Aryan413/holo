@@ -64,6 +64,12 @@ class Retriever:
                 if signature != self._signature:
                     self._rebuild(signature)
 
+    def subjects(self) -> list[str]:
+        """Subject names found in the notes folder, for subject pickers."""
+        self.refresh()
+        chunks, _ = self._state
+        return sorted({c.subject for c in chunks}, key=str.lower)
+
     # ----- searching -----
     def _candidates(self, chunks: list[Chunk], subject: str | None) -> list[int]:
         wanted = _norm(subject) if subject else ""
