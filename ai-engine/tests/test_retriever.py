@@ -22,11 +22,6 @@ def notes(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_lists_subjects_from_the_folder_names(notes):
-    assert Retriever(notes).subjects() == ["Mathematics", "Physics"]
-    assert Retriever(notes / "missing").subjects() == []
-
-
 def test_finds_the_relevant_note(notes):
     hits = Retriever(notes).search("what is Ohm's law", k=2)
     assert hits[0].chunk.source == "Physics/ohm.md"

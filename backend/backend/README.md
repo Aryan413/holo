@@ -19,29 +19,6 @@ Run the tests with `pytest`.
 
 On Mac/Linux use `source venv/bin/activate` and `cp .env.example .env`.
 
-## Get real answers to any question
-
-Out of the box the tutor is in **dev mode**: it only repeats your question back. To make it answer anything, connect a real AI in `.env`, then restart the server. Pick one:
-
-**Free, on your own computer (Ollama)**
-1. Install Ollama and download a model, for example `ollama pull llama3.2`. If you already have a model, run `ollama list` to see its name.
-2. In `.env`:
-   ```
-   LLM_PROVIDER=ollama
-   LLM_MODEL=llama3.2
-   ```
-
-**Free, on your own computer (LM Studio)**
-1. Load a model, open the Developer tab and start the local server.
-2. In `.env`: `LLM_PROVIDER=lmstudio` and `LLM_MODEL=<the model identifier LM Studio shows>`.
-
-**Claude (best quality, especially Malayalam; costs money per use)**
-In `.env`: `LLM_PROVIDER=anthropic` and `LLM_API_KEY=<your key>`.
-
-Any other server with an OpenAI-style API works with `LLM_PROVIDER=openai_compatible`, `LLM_BASE_URL` and `LLM_MODEL`.
-
-If a setting is missing the server refuses to start and says which one. If the AI cannot be reached, the chat returns an error telling you what to check, and nothing half-saved is left behind. Small local models are slower and weaker than Claude, especially in Malayalam; raise `LLM_TIMEOUT_SECONDS` if answers time out.
-
 ## Endpoints
 
 | Method | Path | Who | What |
@@ -62,7 +39,7 @@ If a setting is missing the server refuses to start and says which one. If the A
 ## Where the other parts plug in
 
 - **AI engine (RAG):** already connected. `app/services/rag.py` calls the `holox_ai` package in `../ai-engine`, which searches the notes in `ai-engine/notes/` and hands the best matches to the LLM. `pip install -r requirements.txt` installs it (run from the `backend` folder). See `ai-engine/README.md` for adding notes. Point `NOTES_DIR` in `.env` at a different folder if you want.
-- **Real LLM answers:** see "Get real answers to any question" above. A different vendor means adding a class in `app/services/llm.py`.
+- **Real LLM answers:** set `LLM_PROVIDER=anthropic` and `LLM_API_KEY` in `.env`. Another vendor or a local model means adding a class in `app/services/llm.py`. The Anthropic provider is written but has not been run against the live API yet, so test it once with your key.
 - **Unity avatar / voice:** call `POST /tutor/chat` with the student's token and speak the `reply`. Send `"language": "ml"` for Malayalam.
 - **Dashboard:** read `GET /dashboard/summary` with a teacher token.
 

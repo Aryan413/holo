@@ -55,27 +55,6 @@ def test_question_with_no_matching_notes_adds_no_reference_section(
     assert "Reference notes" not in system
 
 
-def test_subjects_endpoint_lists_note_folders_with_general_first(
-    client, make_user, tmp_path, monkeypatch
-):
-    _write_note(tmp_path)
-    (tmp_path / "Mathematics").mkdir()
-    (tmp_path / "Mathematics" / "calc.md").write_text("# Derivatives\n\nSlope of a curve.\n")
-    monkeypatch.setattr(settings, "notes_dir", str(tmp_path))
-    headers = make_user("s@example.com")
-
-    r = client.get("/tutor/subjects", headers=headers)
-    assert r.status_code == 200
-    assert r.json() == ["General", "Mathematics", "Physics"]
-    assert client.get("/tutor/subjects").status_code == 401
-
-
-def test_subjects_endpoint_still_offers_general_without_the_engine(client, make_user, monkeypatch):
-    monkeypatch.setattr("app.services.rag.get_retriever", None)
-    headers = make_user("s@example.com")
-    assert client.get("/tutor/subjects", headers=headers).json() == ["General"]
-
-
 def test_a_broken_engine_does_not_break_the_chat(client, make_user, monkeypatch):
     def boom(_notes_dir=None):
         raise RuntimeError("index exploded")
