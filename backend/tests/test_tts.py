@@ -12,8 +12,9 @@ class FakeSpeaker:
     def __init__(self, audio=b"ID3-mp3-bytes", error=None):
         self.audio, self.error, self.calls = audio, error, []
 
-    def synthesize(self, text, language):
+    def synthesize(self, text, language, previous_text="", next_text=""):
         self.calls.append((text, language))
+        self.context = (previous_text, next_text)
         if self.error:
             raise self.error
         return self.audio
@@ -59,6 +60,27 @@ def test_speak_returns_mp3(client, make_user, fake):
     assert r.headers["content-type"] == "audio/mpeg"
     assert r.content == b"ID3-mp3-bytes"
     assert fake.calls == [("നമസ്കാരം", "ml")]
+
+
+def test_speak_passes_the_surrounding_text_for_smooth_joins(client, make_user, fake):
+    r = client.post("/voice/speak", headers=make_user("s@example.com"), json={
+        "text": "Current is the flow of charge.", "language": "en",
+        "previous_text": " Voltage pushes charge. ", "next_text": "Resistance slows it.",
+    })
+    assert r.status_code == 200
+    assert fake.context == ("Voltage pushes charge.", "Resistance slows it.")
+
+
+def test_speak_context_is_optional(client, make_user, fake):
+    assert speak(client, make_user("s@example.com")).status_code == 200
+    assert fake.context == ("", "")
+
+
+def test_speak_rejects_huge_context(client, make_user, fake):
+    r = client.post("/voice/speak", headers=make_user("s@example.com"),
+                    json={"text": "hi", "language": "en", "previous_text": "x" * 1001})
+    assert r.status_code == 422
+    assert fake.calls == []
 
 
 def test_speak_rejects_unknown_language(client, make_user, fake):
@@ -124,6 +146,16 @@ def test_elevenlabs_request_shape(monkeypatch):
     assert call["headers"]["xi-api-key"] == "key-123"
     assert call["json"] == {"text": "Hello", "model_id": "eleven_v4", "language_code": "ml"}
     assert call["timeout"] == 7
+
+
+def test_elevenlabs_is_sent_context_only_when_given(monkeypatch):
+    calls = capture_post(monkeypatch, FakeResponse())
+    speaker = ElevenLabsSpeaker("k", "v", "eleven_v4")
+    speaker.synthesize("Middle.", "en", previous_text="Before.", next_text="After.")
+    assert calls[0]["json"]["previous_text"] == "Before."
+    assert calls[0]["json"]["next_text"] == "After."
+    speaker.synthesize("Alone.", "en")
+    assert "previous_text" not in calls[1]["json"] and "next_text" not in calls[1]["json"]
 
 
 def test_multilingual_v2_is_not_sent_a_language_code(monkeypatch):

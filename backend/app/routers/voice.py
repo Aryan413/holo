@@ -65,7 +65,7 @@ def speak(
         raise HTTPException(503, "Realistic voices are turned off, so this computer's voice reads answers instead.")
 
     try:
-        audio = speaker.synthesize(text, body.language)
+        audio = speaker.synthesize(text, body.language, body.previous_text.strip(), body.next_text.strip())
     except VoiceUnavailable as exc:
         raise HTTPException(503, str(exc))
     except Exception:

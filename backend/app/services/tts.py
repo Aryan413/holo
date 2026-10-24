@@ -16,8 +16,9 @@ class VoiceUnavailable(Exception):
 
 
 class Speaker(Protocol):
-    def synthesize(self, text: str, language: str) -> bytes:
-        """Returns MP3 audio of the text read in the given language ("en" or "ml")."""
+    def synthesize(self, text: str, language: str, previous_text: str = "", next_text: str = "") -> bytes:
+        """Returns MP3 audio of the text read in the given language ("en" or "ml").
+        previous_text / next_text are context only (not spoken), for smooth joins between pieces."""
         ...
 
 
@@ -32,11 +33,15 @@ class ElevenLabsSpeaker:
         self.model = model
         self.timeout = timeout
 
-    def synthesize(self, text: str, language: str) -> bytes:
+    def synthesize(self, text: str, language: str, previous_text: str = "", next_text: str = "") -> bytes:
         body = {"text": text, "model_id": self.model}
         # Pins the language (and how numbers are read). multilingual_v2 models reject this field.
         if not self.model.startswith("eleven_multilingual"):
             body["language_code"] = language
+        if previous_text:
+            body["previous_text"] = previous_text
+        if next_text:
+            body["next_text"] = next_text
         try:
             response = httpx.post(
                 self.URL.format(voice_id=self.voice_id),

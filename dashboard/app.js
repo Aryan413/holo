@@ -473,16 +473,20 @@ function pickVoice(language) {
 
 // Read sentence by sentence: browsers cut off long single utterances (Chrome after ~15 s),
 // and Pause can then stop between sentences and Resume carry on from the same one.
-// Server parts are longer: fewer requests and more natural phrasing, while the first one still starts quickly.
+// Server voice: a short first part so speech starts quickly, then long parts so there are
+// few joins (each join is a new recording, which can sound like a break in the voice).
 const BROWSER_PART_CHARS = 160;
-const SERVER_PART_CHARS = 400;
+const SERVER_FIRST_PART_CHARS = 220;
+const SERVER_PART_CHARS = 1200;
+const SPEECH_CONTEXT_CHARS = 300; // text either side sent along so the joins sound continuous
 
-function speechParts(text, maxChars = BROWSER_PART_CHARS) {
+function speechParts(text, maxChars = BROWSER_PART_CHARS, firstMaxChars = maxChars) {
   const sentences = forSpeech(text).match(/[^.!?।]+[.!?।]*/g) || [];
   const parts = [];
   for (const sentence of sentences.map((s) => s.trim()).filter(Boolean)) {
     const last = parts[parts.length - 1];
-    if (last && last.length + sentence.length < maxChars) parts[parts.length - 1] = `${last} ${sentence}`;
+    const limit = parts.length === 1 ? firstMaxChars : maxChars;
+    if (last && last.length + sentence.length < limit) parts[parts.length - 1] = `${last} ${sentence}`;
     else parts.push(sentence);
   }
   return parts;
@@ -500,10 +504,19 @@ async function serverSpeechOn() {
 const speechCache = new Map();
 const SPEECH_CACHE_SIZE = 40;
 
-function speechAudio(text, language) {
-  const key = `${language}|${text}`;
+// The text of the parts around part i, for a smooth join (context only, not spoken).
+function partContext(parts, i) {
+  return {
+    previous_text: (parts[i - 1] || "").slice(-SPEECH_CONTEXT_CHARS),
+    next_text: (parts[i + 1] || "").slice(0, SPEECH_CONTEXT_CHARS),
+  };
+}
+
+function speechAudio(speech, i) {
+  const text = speech.parts[i];
+  const key = `${speech.language}|${text}`;
   if (!speechCache.has(key)) {
-    const pending = fetchSpeech(text, language);
+    const pending = fetchSpeech({ text, language: speech.language, ...partContext(speech.parts, i) });
     pending.catch(() => speechCache.delete(key)); // a failure is retried next time
     speechCache.set(key, pending);
     while (speechCache.size > SPEECH_CACHE_SIZE) {
@@ -515,13 +528,13 @@ function speechAudio(text, language) {
   return speechCache.get(key);
 }
 
-async function fetchSpeech(text, language) {
+async function fetchSpeech(request) {
   const headers = { "content-type": "application/json" };
   const token = sessionStorage.getItem(TOKEN_KEY);
   if (token) headers.authorization = `Bearer ${token}`;
   let response;
   try {
-    response = await fetch("/voice/speak", { method: "POST", headers, body: JSON.stringify({ text, language }) });
+    response = await fetch("/voice/speak", { method: "POST", headers, body: JSON.stringify(request) });
   } catch {
     throw new ApiError(0, "Can't reach the server for the voice.");
   }
@@ -552,7 +565,7 @@ async function speak(text, language, button) {
     say("This computer has no Malayalam voice. Add one in Windows Settings, Time & language, Speech.");
     return;
   }
-  const parts = speechParts(text, server ? SERVER_PART_CHARS : BROWSER_PART_CHARS);
+  const parts = server ? speechParts(text, SERVER_PART_CHARS, SERVER_FIRST_PART_CHARS) : speechParts(text);
   if (!parts.length) return;
   say("");
   voice.speech = { parts, index: 0, language, found, paused: false, server };
@@ -565,14 +578,15 @@ async function playServerPart(speech, run) {
   voice.audio = null;
   const current = () => run === voice.speechRun && voice.speech === speech;
   try {
-    const url = await speechAudio(speech.parts[speech.index], speech.language);
+    const url = await speechAudio(speech, speech.index);
     if (!current()) return;
     const audio = new Audio(url);
     audio.addEventListener("ended", () => { if (current()) { speech.index += 1; speakNextPart(); } });
     audio.addEventListener("error", () => { if (current()) fallBackToBrowser(speech); });
     voice.audio = audio;
-    const next = speech.parts[speech.index + 1];
-    if (next) speechAudio(next, speech.language).catch(() => {}); // ready before this part ends
+    if (speech.index + 1 < speech.parts.length) {
+      speechAudio(speech, speech.index + 1).catch(() => {}); // ready before this part ends
+    }
     if (!speech.paused) await audio.play();
   } catch (problem) {
     if (current()) fallBackToBrowser(speech, problem);
