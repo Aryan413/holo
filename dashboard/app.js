@@ -397,7 +397,7 @@ async function ask(text) {
     loadSessions();
     if (voice.readAloud && state.chat === chat && state.view === "tutor") {
       // Never let a speech problem throw away an answer that arrived fine.
-      try { speak(reply.reply, chat.language); } catch { say("Could not read the answer aloud on this device."); }
+      speak(reply.reply, chat.language).catch(() => say("Could not read the answer aloud on this device."));
     }
   } catch (problem) {
     chat.turns.splice(-2, 2); // drop the unanswered question; it goes back in the box to resend
@@ -418,8 +418,10 @@ const voice = {
   phase: "idle", // idle | recording | transcribing
   recorder: null, stream: null, chunks: [], timer: null, seconds: 0, discard: false,
   listening: null, // the Listen button that is currently speaking
-  speech: null, // the answer being read: { parts, index, language, found, paused }
+  speech: null, // the answer being read: { parts, index, language, found, paused, server }
   speechRun: 0, // bumped on pause/stop so events from a cancelled sentence are ignored
+  serverSpeech: null, // null = not asked yet; true = the backend reads aloud with a realistic voice
+  audio: null, // the <audio> playing the current part of a server-read answer
 };
 
 function loadPref(key, fallback) {
@@ -449,7 +451,9 @@ function say(message) {
   if (ui.voiceNote && ui.voiceNote.isConnected) ui.voiceNote.textContent = message;
 }
 
-/* --- spoken answers (the browser's own voices, no server needed) --- */
+/* --- spoken answers ---
+   With TTS_PROVIDER=elevenlabs the backend makes realistic audio (POST /voice/speak).
+   Otherwise, or whenever that fails, the browser's own voices read the answer. */
 
 function forSpeech(text) {
   return text
@@ -469,40 +473,126 @@ function pickVoice(language) {
 
 // Read sentence by sentence: browsers cut off long single utterances (Chrome after ~15 s),
 // and Pause can then stop between sentences and Resume carry on from the same one.
-function speechParts(text) {
+// Server parts are longer: fewer requests and more natural phrasing, while the first one still starts quickly.
+const BROWSER_PART_CHARS = 160;
+const SERVER_PART_CHARS = 400;
+
+function speechParts(text, maxChars = BROWSER_PART_CHARS) {
   const sentences = forSpeech(text).match(/[^.!?।]+[.!?।]*/g) || [];
   const parts = [];
   for (const sentence of sentences.map((s) => s.trim()).filter(Boolean)) {
     const last = parts[parts.length - 1];
-    if (last && last.length + sentence.length < 160) parts[parts.length - 1] = `${last} ${sentence}`;
+    if (last && last.length + sentence.length < maxChars) parts[parts.length - 1] = `${last} ${sentence}`;
     else parts.push(sentence);
   }
   return parts;
 }
 
+async function serverSpeechOn() {
+  if (voice.serverSpeech === null) {
+    try { voice.serverSpeech = (await api("/voice/options")).speech === "elevenlabs"; } catch { return false; }
+  }
+  return voice.serverSpeech;
+}
+
+// "language|text" -> promise of an object URL for its audio, so Listen again and the
+// prefetched next part cost nothing extra. Oldest entries are dropped past the limit.
+const speechCache = new Map();
+const SPEECH_CACHE_SIZE = 40;
+
+function speechAudio(text, language) {
+  const key = `${language}|${text}`;
+  if (!speechCache.has(key)) {
+    const pending = fetchSpeech(text, language);
+    pending.catch(() => speechCache.delete(key)); // a failure is retried next time
+    speechCache.set(key, pending);
+    while (speechCache.size > SPEECH_CACHE_SIZE) {
+      const [oldest, url] = speechCache.entries().next().value;
+      speechCache.delete(oldest);
+      url.then(URL.revokeObjectURL, () => {});
+    }
+  }
+  return speechCache.get(key);
+}
+
+async function fetchSpeech(text, language) {
+  const headers = { "content-type": "application/json" };
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  if (token) headers.authorization = `Bearer ${token}`;
+  let response;
+  try {
+    response = await fetch("/voice/speak", { method: "POST", headers, body: JSON.stringify({ text, language }) });
+  } catch {
+    throw new ApiError(0, "Can't reach the server for the voice.");
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(response.status, describeError(data, response.status));
+  }
+  return URL.createObjectURL(await response.blob());
+}
+
 function stopSpeaking() {
   voice.speechRun += 1;
   voice.speech = null;
+  if (voice.audio) { voice.audio.pause(); voice.audio = null; }
   if (canSpeak()) window.speechSynthesis.cancel();
   if (voice.listening) { voice.listening.textContent = "Listen"; voice.listening = null; }
   paintSpeechBar();
 }
 
-function speak(text, language, button) {
-  if (!canSpeak()) return;
+async function speak(text, language, button) {
   stopSpeaking();
-  const found = pickVoice(language);
-  if (language === "ml" && !found) {
+  const run = voice.speechRun;
+  const server = await serverSpeechOn();
+  if (run !== voice.speechRun) return; // stopped, or another answer started, while we asked
+  if (!server && !canSpeak()) return;
+  const found = canSpeak() ? pickVoice(language) : null;
+  if (!server && language === "ml" && !found) {
     say("This computer has no Malayalam voice. Add one in Windows Settings, Time & language, Speech.");
     return;
   }
-  const parts = speechParts(text);
+  const parts = speechParts(text, server ? SERVER_PART_CHARS : BROWSER_PART_CHARS);
   if (!parts.length) return;
   say("");
-  voice.speech = { parts, index: 0, language, found, paused: false };
+  voice.speech = { parts, index: 0, language, found, paused: false, server };
   if (button) { button.textContent = "Stop"; voice.listening = button; }
   speakNextPart();
   paintSpeechBar();
+}
+
+async function playServerPart(speech, run) {
+  voice.audio = null;
+  const current = () => run === voice.speechRun && voice.speech === speech;
+  try {
+    const url = await speechAudio(speech.parts[speech.index], speech.language);
+    if (!current()) return;
+    const audio = new Audio(url);
+    audio.addEventListener("ended", () => { if (current()) { speech.index += 1; speakNextPart(); } });
+    audio.addEventListener("error", () => { if (current()) fallBackToBrowser(speech); });
+    voice.audio = audio;
+    const next = speech.parts[speech.index + 1];
+    if (next) speechAudio(next, speech.language).catch(() => {}); // ready before this part ends
+    if (!speech.paused) await audio.play();
+  } catch (problem) {
+    if (current()) fallBackToBrowser(speech, problem);
+  }
+}
+
+// The realistic voice failed (offline, key, allowance): finish the answer with the browser's voice.
+function fallBackToBrowser(speech, problem) {
+  if (problem && problem.status === 503) voice.serverSpeech = false; // won't fix itself during this visit
+  if (voice.audio) { voice.audio.pause(); voice.audio = null; }
+  if (!canSpeak() || (speech.language === "ml" && !speech.found)) {
+    stopSpeaking();
+    say(problem ? problem.message : "Could not read the answer aloud.");
+    return;
+  }
+  say("The realistic voice isn't available right now, so this computer's voice is reading instead.");
+  speech.parts = speechParts(speech.parts.slice(speech.index).join(" "));
+  speech.index = 0;
+  speech.server = false;
+  speakNextPart();
 }
 
 function speakNextPart() {
@@ -510,6 +600,7 @@ function speakNextPart() {
   if (!speech || speech.paused) return;
   if (speech.index >= speech.parts.length) { stopSpeaking(); return; }
   const run = ++voice.speechRun;
+  if (speech.server) { playServerPart(speech, run); return; }
   const utterance = new SpeechSynthesisUtterance(speech.parts[speech.index]);
   utterance.lang = speech.language === "ml" ? "ml-IN" : (speech.found ? speech.found.lang : "en-IN");
   if (speech.found) utterance.voice = speech.found;
@@ -518,19 +609,28 @@ function speakNextPart() {
   window.speechSynthesis.speak(utterance);
 }
 
-// Pause cancels and remembers the sentence: speechSynthesis.pause() is unreliable in Chrome.
+// Browser voice: Pause cancels and remembers the sentence (speechSynthesis.pause() is unreliable
+// in Chrome). Server voice: the audio pauses and resumes mid-word.
 function pauseSpeaking() {
-  if (!voice.speech) return;
-  voice.speech.paused = true;
-  voice.speechRun += 1;
-  window.speechSynthesis.cancel();
+  const speech = voice.speech;
+  if (!speech) return;
+  speech.paused = true;
+  if (speech.server) {
+    if (voice.audio) voice.audio.pause();
+  } else {
+    voice.speechRun += 1;
+    window.speechSynthesis.cancel();
+  }
   paintSpeechBar();
 }
 
 function resumeSpeaking() {
-  if (!voice.speech) return;
-  voice.speech.paused = false;
-  speakNextPart();
+  const speech = voice.speech;
+  if (!speech) return;
+  speech.paused = false;
+  if (!speech.server) speakNextPart();
+  else if (voice.audio) voice.audio.play().catch(() => { if (voice.speech === speech) fallBackToBrowser(speech); });
+  // else the part is still downloading and starts by itself now that it isn't paused
   paintSpeechBar();
 }
 

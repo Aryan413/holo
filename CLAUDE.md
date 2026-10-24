@@ -48,6 +48,7 @@ holo/
 - `app/routers/dashboard.py`: `/dashboard/summary` (teachers only).
 - `app/services/llm.py`: AI providers: `echo` (dev placeholder, only repeats the question), `anthropic`, `ollama`, `lmstudio`, `openai_compatible`. Chosen with `LLM_PROVIDER`.
 - `app/routers/voice.py` and `app/services/stt.py`: `POST /voice/transcribe` turns a recording into text with faster-whisper (optional install: `requirements-voice.txt`, plus `requirements-voice-gpu.txt` for NVIDIA cards; `WHISPER_*` settings default to `auto`: large-v3 on the GPU, small on the CPU). Missing install gives a 503 with instructions. The note titles (first heading of each note, via `holox_ai` `Retriever.topics()`) are sent to Whisper as a vocabulary hint so course terms are spelled right.
+- `app/services/tts.py`: read-aloud voice. `TTS_PROVIDER=browser` (default, the web app uses the computer's voices) or `elevenlabs` (`POST /voice/speak` returns MP3 from ElevenLabs; key in `ELEVENLABS_API_KEY`, model `eleven_v4` for Malayalam). `GET /voice/options` tells the web app which. Any failure falls back to the browser voice.
 - `app/services/rag.py`: wraps `holox_ai`. If the engine is missing or fails it returns no notes rather than crashing.
 - `tests/`: pytest suite (in-memory SQLite). Run from `backend/`.
 

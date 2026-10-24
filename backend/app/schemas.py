@@ -68,6 +68,12 @@ class SessionDetail(SessionOut):
     messages: list[MessageOut]
 
 
+# ---------- voice ----------
+class SpeakRequest(BaseModel):
+    text: str = Field(min_length=1)  # upper limit is MAX_SPEECH_CHARS, checked in the router
+    language: Literal["en", "ml"] = "en"
+
+
 # ---------- quizzes ----------
 class QuestionCreate(BaseModel):
     text: str = Field(min_length=1)

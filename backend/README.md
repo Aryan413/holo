@@ -58,6 +58,9 @@ If a setting is missing the server refuses to start and says which one. If the A
 | GET | `/quizzes/{id}` | logged in | Quiz questions; correct answers only shown to teachers |
 | POST | `/quizzes/{id}/attempts` | logged in | Submit answers, get the score |
 | GET | `/dashboard/summary` | teacher | Counts, quiz averages, most-asked subjects |
+| POST | `/voice/transcribe` | logged in | Recording (`audio`) plus `language`; returns the text |
+| GET | `/voice/options` | logged in | Who reads answers aloud: `elevenlabs` or `browser` |
+| POST | `/voice/speak` | logged in | JSON `text` and `language`; returns MP3 audio (ElevenLabs) |
 
 ## Where the other parts plug in
 
@@ -78,8 +81,9 @@ If a setting is missing the server refuses to start and says which one. If the A
 
 The Tutor page has a **Speak** button and two options, *Read answers aloud* and *Send right after speaking*.
 
-- **Spoken answers** use the voices already on the computer (the browser's speech engine). Nothing to install.
-  For Malayalam the computer needs a Malayalam voice (Windows: Settings, Time & language, Speech).
+- **Spoken answers** use the voices already on the computer (the browser's speech engine) unless you turn on
+  ElevenLabs (below). Nothing to install. For Malayalam the computer needs a Malayalam voice (Windows: Settings,
+  Time & language, Speech).
 - **Spoken questions** are recorded in the browser and sent to `POST /voice/transcribe`, which turns them into text with
   [faster-whisper](https://github.com/SYSTRAN/faster-whisper). It runs on your own machine, works offline after the first
   download, and works in every browser (including Brave, which blocks the browser's built-in listening).
@@ -115,3 +119,27 @@ title heading; Malayalam titles help Malayalam speech the same way. On noisy tes
 
 Without the extra install the rest of the app works, and the Speak button shows a message saying what to install.
 The microphone only works on `http://127.0.0.1:8000` or `localhost` (or https), not on a plain network address.
+
+### Realistic read-aloud voice (ElevenLabs)
+
+The browser's voices sound robotic. For a natural voice, in `.env`:
+
+```
+TTS_PROVIDER=elevenlabs
+ELEVENLABS_API_KEY=<your key from elevenlabs.io, profile, API keys>
+```
+
+Restart the server and press Ctrl+F5 in the browser. Answers are now read by ElevenLabs (`POST /voice/speak`, signed-in
+users only). The key stays on the server; the browser only receives the audio.
+
+- **Voice:** `ELEVENLABS_VOICE_ID` picks it (default "George", a calm male narrator). In the ElevenLabs Voice Library,
+  open a voice's "..." menu and choose *Copy voice ID*. A deep Indian-English male voice suits the Adi Shankaracharya
+  character; agree on one as a team so every machine sounds the same.
+- **Model:** `ELEVENLABS_MODEL=eleven_v4` (default) speaks English and Malayalam. `eleven_v4_turbo` starts faster.
+  Do not use `eleven_multilingual_v2`: it has no Malayalam.
+- **Cost:** ElevenLabs charges per character read. The free plan's monthly allowance runs out quickly if every answer
+  is read aloud; untick *Read answers aloud* while testing, or use a paid plan for demos. Replaying with *Listen* in the
+  same visit reuses the audio and costs nothing.
+- **If it fails** (no internet, wrong key, allowance used up) the answer is still shown and the browser's voice reads
+  it instead; the server log says what went wrong.
+- `MAX_SPEECH_CHARS` (default 3000) caps one request. The web app sends a few sentences at a time, well under it.
