@@ -174,6 +174,12 @@ def test_explicit_settings_are_kept(monkeypatch):
     assert stt.resolve_runtime("medium", "cpu", "int8") == ("medium", "cpu", "int8")
 
 
+def test_gpu_code_cache_is_large_enough_to_keep():
+    import os
+
+    assert int(os.environ["CUDA_CACHE_MAXSIZE"]) >= 1024**3
+
+
 def test_whisper_missing_library_raises_helpful_error(monkeypatch):
     import builtins
 

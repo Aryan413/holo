@@ -14,6 +14,11 @@ from .rag import list_topics
 
 logger = logging.getLogger("uvicorn.error")
 
+# Newer NVIDIA cards (e.g. RTX 50xx) have Whisper's GPU code compiled by the driver on first
+# use. The driver's default cache is too small to keep it, so every server restart made the
+# first spoken question wait ~17 s; with room to cache it, ~2 s. Set before CUDA starts.
+os.environ.setdefault("CUDA_CACHE_MAXSIZE", str(4 * 1024**3))
+
 LANGUAGES = {"en", "ml"}
 MALAYALAM = re.compile(r"[ഀ-ൿ]")
 MAX_PROMPT_CHARS = 600  # Whisper only reads the last ~224 tokens of a prompt
