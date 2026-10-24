@@ -94,6 +94,39 @@ def test_unexpected_failure_is_a_502_without_details(client, make_user, fake):
     assert "secret" not in r.json()["detail"]
 
 
+def test_vocabulary_prompt_uses_note_titles_in_the_spoken_language(monkeypatch):
+    monkeypatch.setattr(stt, "list_topics", lambda: ["Ohm's law", "ഓമിന്റെ നിയമം", "Kirchhoff's laws"])
+    assert stt.vocabulary_prompt("en") == "Topics: Ohm's law, Kirchhoff's laws."
+    assert stt.vocabulary_prompt("ml") == "ഓമിന്റെ നിയമം."
+
+
+def test_vocabulary_prompt_is_none_without_notes(monkeypatch):
+    monkeypatch.setattr(stt, "list_topics", lambda: [])
+    assert stt.vocabulary_prompt("en") is None
+    monkeypatch.setattr(stt, "list_topics", lambda: ["Ohm's law"])
+    assert stt.vocabulary_prompt("ml") is None  # English titles don't help Malayalam speech
+
+
+def test_vocabulary_prompt_stays_short(monkeypatch):
+    monkeypatch.setattr(stt, "list_topics", lambda: [f"Topic number {i}" for i in range(500)])
+    assert len(stt.vocabulary_prompt("en")) <= stt.MAX_PROMPT_CHARS + len("Topics: .")
+
+
+def test_whisper_is_given_the_vocabulary_prompt(monkeypatch):
+    monkeypatch.setattr(stt, "list_topics", lambda: ["Ohm's law"])
+
+    class FakeModel:
+        def transcribe(self, path, **options):
+            self.options = options
+            return [type("Segment", (), {"text": " What is Ohm's law? "})()], None
+
+    transcriber = stt.WhisperTranscriber()
+    transcriber._model = FakeModel()
+    assert transcriber.transcribe(b"audio", "en") == "What is Ohm's law?"
+    assert transcriber._model.options["initial_prompt"] == "Topics: Ohm's law."
+    assert transcriber._model.options["language"] == "en"
+
+
 def test_whisper_missing_library_raises_helpful_error(monkeypatch):
     import builtins
 

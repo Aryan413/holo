@@ -33,7 +33,6 @@ Then open <http://127.0.0.1:8000/>.
 - `index.html` – the page shell
 - `styles.css` – look and feel (dark by default, follows the computer's light setting)
 - `app.js` – sign-in, tutor, quizzes, teacher screens; talks to the backend API
-- `swarm.js` – background animation: a swarm of ASCII characters that follows the pointer and, on the sign-in screen, gathers into a turning globe; also the title "decode" effect and the tutor's "Thinking" bar. It is decoration only and does not touch app data. With "reduce motion" on in the system, it draws one still frame and nothing moves.
 
 ## Notes
 

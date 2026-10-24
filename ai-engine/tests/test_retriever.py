@@ -27,6 +27,18 @@ def test_lists_subjects_from_the_folder_names(notes):
     assert Retriever(notes / "missing").subjects() == []
 
 
+def test_topics_are_the_note_titles_without_the_readme(notes):
+    assert Retriever(notes).topics() == ["Derivatives", "Ohm's law"]
+    assert Retriever(notes / "missing").topics() == []
+
+
+def test_topics_skip_files_without_a_heading_and_repeats(tmp_path):
+    (tmp_path / "plain.txt").write_text("No heading here.", encoding="utf-8")
+    (tmp_path / "a.md").write_text("# Ohm's law\n\nV = IR\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("# Ohm's law\n\nMore about it.\n", encoding="utf-8")
+    assert Retriever(tmp_path).topics() == ["Ohm's law"]
+
+
 def test_finds_the_relevant_note(notes):
     hits = Retriever(notes).search("what is Ohm's law", k=2)
     assert hits[0].chunk.source == "Physics/ohm.md"

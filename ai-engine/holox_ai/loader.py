@@ -33,6 +33,19 @@ def list_note_files(notes_dir: Path) -> list[Path]:
     )
 
 
+def note_title(path: Path) -> str:
+    """The first markdown heading in a note file, or "" if it has none."""
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return ""
+    for line in text.splitlines():
+        match = _HEADING.match(line)
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
 def split_sections(text: str) -> list[tuple[str, str]]:
     """Split a document into (heading, body) sections at markdown headings."""
     sections: list[tuple[str, str]] = []
