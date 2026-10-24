@@ -17,24 +17,10 @@
   --ghost: #9ed0e6;
   --good: #8ed6a8;
   --bad: #ff9c8f;
-
-  /* colours of the background swarm (swarm.js reads these) */
-  --sw1: #9ed0e6;
-  --sw2: #f0b95a;
-  --sw3: #c79bff;
-  --sw4: #8ed6a8;
-  --sw5: #ff9c8f;
-  --sw6: #ff7ad9;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --sw1: #1f6f93;
-    --sw2: #b7791f;
-    --sw3: #7a3fc7;
-    --sw4: #1b6b3a;
-    --sw5: #b3261e;
-    --sw6: #b0308f;
     --bg: #eef1f6;
     --panel: #ffffff;
     --raise: #e3e8f1;
@@ -58,10 +44,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- background swarm (see swarm.js) ---------- */
-#swarm { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
-#root { position: relative; z-index: 1; }
-
 h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.2; margin: 0; }
 h2 { font-size: 1.6rem; }
 h3 { font-size: 1.15rem; }
@@ -84,9 +66,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 600;
   cursor: pointer;
 }
-.btn { transition: box-shadow .2s ease, transform .15s ease, filter .2s ease; }
-.btn:hover { filter: brightness(1.06); box-shadow: 0 0 18px color-mix(in srgb, var(--lamp) 55%, transparent); }
-.btn:active { transform: translateY(1px); }
+.btn:hover { filter: brightness(1.06); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
 .btn.ghost:hover { background: var(--panel); filter: none; }
@@ -108,25 +88,13 @@ textarea { resize: vertical; }
 .choice input { accent-color: var(--lamp); }
 
 /* ---------- sign in: the one bold moment ---------- */
-.auth { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100vh; }
-/* a faint scan beam sweeping down the screen, like a hologram projector */
-.auth::after {
-  content: "";
-  position: absolute;
-  left: 0; right: 0; top: 0;
-  height: 120px;
-  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--ghost) 14%, transparent), transparent);
-  pointer-events: none;
-  animation: scan 7s linear infinite;
-}
-@keyframes scan { from { transform: translateY(-120px); } to { transform: translateY(100vh); } }
+.auth { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100vh; }
 .hero {
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: clamp(2rem, 6vw, 5rem);
   background: var(--panel);
-  background: color-mix(in srgb, var(--panel) 45%, transparent); /* the swarm shows through */
   border-right: 1px solid var(--line);
 }
 .wordmark {
@@ -179,7 +147,6 @@ textarea { resize: vertical; }
   gap: .5rem 1.5rem;
   padding: .55rem clamp(1rem, 3vw, 2rem);
   background: var(--panel);
-  background: color-mix(in srgb, var(--panel) 82%, transparent);
   border-bottom: 1px solid var(--line);
 }
 .mark { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; }
@@ -216,11 +183,8 @@ main > h2 { margin-bottom: 1.25rem; }
   border-left: 2px solid var(--lamp);
   padding-left: 1rem;
 }
-.thinking { color: var(--muted); font-family: ui-monospace, Consolas, "Courier New", monospace; animation: pulse 1.4s ease-in-out infinite; }
+.thinking { color: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
-/* new messages and list rows rise into place */
-.turn:last-child, .rows li { animation: rise .35s ease-out both; }
-@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 .composer { display: grid; gap: .75rem; border-top: 1px solid var(--line); padding-top: 1rem; background: var(--bg); }
 .composer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.5rem; color: var(--muted); font-size: .95rem; }
