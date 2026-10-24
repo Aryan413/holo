@@ -25,8 +25,9 @@ Then open <http://127.0.0.1:8000/>.
 - Create an account on the sign-in screen. Teachers need the `TEACHER_SIGNUP_CODE` from `backend/.env`.
 - Enter sends a message, Shift+Enter starts a new line.
 - Past conversations are listed beside the chat.
-- **Voice:** press *Speak*, ask your question, press *Stop*. *Read answers aloud* speaks each reply, and every reply has a
-  *Listen* button. Speaking needs the optional speech install, see `backend/README.md`.
+- **Voice:** press *Speak*, ask your question, press *Stop*. Answers are read aloud automatically (untick *Read answers
+  aloud* to turn it off); while one is being read, *Pause*/*Resume* and *Stop reading* appear above the question box.
+  Every reply also has a *Listen* button. Speaking needs the optional speech install, see `backend/README.md`.
 
 ## Files
 

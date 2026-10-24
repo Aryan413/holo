@@ -127,6 +127,53 @@ def test_whisper_is_given_the_vocabulary_prompt(monkeypatch):
     assert transcriber._model.options["language"] == "en"
 
 
+def test_whisper_uses_accuracy_options(monkeypatch):
+    monkeypatch.setattr(stt, "list_topics", lambda: [])
+
+    class FakeModel:
+        def transcribe(self, path, **options):
+            self.options = options
+            return [], None
+
+    transcriber = stt.WhisperTranscriber()
+    transcriber._model = FakeModel()
+    transcriber.transcribe(b"audio", "en")
+    options = transcriber._model.options
+    assert options["beam_size"] == 5
+    assert options["condition_on_previous_text"] is False
+    assert options["vad_filter"] is True
+
+
+def test_made_up_text_over_noise_is_dropped(monkeypatch):
+    monkeypatch.setattr(stt, "list_topics", lambda: [])
+
+    def segment(text, no_speech_prob, avg_logprob):
+        return type("Segment", (), {"text": text, "no_speech_prob": no_speech_prob, "avg_logprob": avg_logprob})()
+
+    class FakeModel:
+        def transcribe(self, path, **options):
+            return [segment(" What is Ohm's law?", 0.05, -0.2), segment(" Thank you for watching.", 0.9, -1.4)], None
+
+    transcriber = stt.WhisperTranscriber()
+    transcriber._model = FakeModel()
+    assert transcriber.transcribe(b"audio", "en") == "What is Ohm's law?"
+
+
+def test_auto_picks_large_model_on_gpu(monkeypatch):
+    monkeypatch.setattr(stt, "gpu_ready", lambda: True)
+    assert stt.resolve_runtime("auto", "auto", "auto") == ("large-v3", "cuda", "int8_float16")
+
+
+def test_auto_picks_small_model_on_cpu(monkeypatch):
+    monkeypatch.setattr(stt, "gpu_ready", lambda: False)
+    assert stt.resolve_runtime("auto", "auto", "auto") == ("small", "cpu", "int8")
+
+
+def test_explicit_settings_are_kept(monkeypatch):
+    monkeypatch.setattr(stt, "gpu_ready", lambda: True)
+    assert stt.resolve_runtime("medium", "cpu", "int8") == ("medium", "cpu", "int8")
+
+
 def test_whisper_missing_library_raises_helpful_error(monkeypatch):
     import builtins
 

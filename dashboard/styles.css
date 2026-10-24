@@ -191,6 +191,7 @@ main > h2 { margin-bottom: 1.25rem; }
 .composer-row { display: flex; gap: .75rem; align-items: flex-end; }
 .composer-row textarea { flex: 1; min-height: 3.25rem; }
 .voice-note { min-height: 1.4rem; }
+.speech-bar { gap: .5rem .75rem; }
 .mic { min-width: 6.5rem; }
 .mic[data-state="recording"] { color: var(--bad); border-color: var(--bad); }
 .mic[data-state="recording"]::before {

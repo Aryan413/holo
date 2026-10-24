@@ -1,0 +1,5 @@
+# Optional: run speech to text on an NVIDIA graphics card. Much more accurate (large-v3) and fast.
+# About 1 GB of CUDA libraries. Needs an up-to-date NVIDIA driver; nothing else to install.
+-r requirements-voice.txt
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
