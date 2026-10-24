@@ -47,7 +47,7 @@ holo/
 - `app/routers/quiz.py`: `/quizzes` (teachers create; students list, fetch and attempt). Students never receive `correct_index`.
 - `app/routers/dashboard.py`: `/dashboard/summary` (teachers only).
 - `app/services/llm.py`: AI providers: `echo` (dev placeholder, only repeats the question), `anthropic`, `ollama`, `lmstudio`, `openai_compatible`. Chosen with `LLM_PROVIDER`.
-- `app/routers/voice.py` and `app/services/stt.py`: `POST /voice/transcribe` turns a recording into text with faster-whisper (optional install: `requirements-voice.txt`; `WHISPER_*` settings). Missing install gives a 503 with instructions. The note titles (first heading of each note, via `holox_ai` `Retriever.topics()`) are sent to Whisper as a vocabulary hint so course terms are spelled right.
+- `app/routers/voice.py` and `app/services/stt.py`: `POST /voice/transcribe` turns a recording into text with faster-whisper (optional install: `requirements-voice.txt`, plus `requirements-voice-gpu.txt` for NVIDIA cards; `WHISPER_*` settings default to `auto`: large-v3 on the GPU, small on the CPU). Missing install gives a 503 with instructions. The note titles (first heading of each note, via `holox_ai` `Retriever.topics()`) are sent to Whisper as a vocabulary hint so course terms are spelled right.
 - `app/services/rag.py`: wraps `holox_ai`. If the engine is missing or fails it returns no notes rather than crashing.
 - `tests/`: pytest suite (in-memory SQLite). Run from `backend/`.
 
@@ -66,7 +66,7 @@ holo/
 - Student tabs: Tutor, Quizzes. Teacher tabs: Overview, Tutor, Quizzes, New quiz.
 - Text from the server is always inserted with `textContent` (never `innerHTML`). Keep it that way.
 - The sign-in token lives in `sessionStorage`. System fonts only, so it works offline.
-- Voice: the Speak button records with `MediaRecorder` and posts to `/voice/transcribe`; spoken answers use the browser's `speechSynthesis` (no server). A speech failure must never discard a received answer.
+- Voice: the Speak button records with `MediaRecorder` and posts to `/voice/transcribe`; spoken answers use the browser's `speechSynthesis` (no server), read sentence by sentence so Pause/Resume work, and are on by default. A speech failure must never discard a received answer.
 
 ### `avatar-unity/`
 

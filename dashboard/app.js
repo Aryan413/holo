@@ -271,9 +271,11 @@ function viewTutor(main) {
     ? h("button", { class: "btn ghost mic", type: "button", onclick: toggleRecording, "data-state": "idle" }, "Speak")
     : null;
   const voiceNote = h("p", { class: "hint voice-note", role: "status" });
-  const form = h("form", { class: "composer" }, meta, voiceOptions(),
+  const speechBar = speechControls();
+  const form = h("form", { class: "composer" }, meta, voiceOptions(), speechBar,
     h("div", { class: "composer-row" }, input, mic, send), voiceNote);
-  Object.assign(ui, { sessionsList, transcript, meta, input, send, mic, voiceNote, form });
+  Object.assign(ui, { sessionsList, transcript, meta, input, send, mic, voiceNote, form, speechBar });
+  paintSpeechBar();
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -411,11 +413,13 @@ async function ask(text) {
 
 const MAX_RECORDING_SECONDS = 60;
 const voice = {
-  readAloud: loadPref("mentora.readAloud", false),
+  readAloud: loadPref("mentora.readAloud", true),
   sendAfter: loadPref("mentora.sendAfter", false),
   phase: "idle", // idle | recording | transcribing
   recorder: null, stream: null, chunks: [], timer: null, seconds: 0, discard: false,
   listening: null, // the Listen button that is currently speaking
+  speech: null, // the answer being read: { parts, index, language, found, paused }
+  speechRun: 0, // bumped on pause/stop so events from a cancelled sentence are ignored
 };
 
 function loadPref(key, fallback) {
@@ -463,28 +467,90 @@ function pickVoice(language) {
     || voices.find((v) => v.lang.toLowerCase().startsWith("en")) || null;
 }
 
+// Read sentence by sentence: browsers cut off long single utterances (Chrome after ~15 s),
+// and Pause can then stop between sentences and Resume carry on from the same one.
+function speechParts(text) {
+  const sentences = forSpeech(text).match(/[^.!?।]+[.!?।]*/g) || [];
+  const parts = [];
+  for (const sentence of sentences.map((s) => s.trim()).filter(Boolean)) {
+    const last = parts[parts.length - 1];
+    if (last && last.length + sentence.length < 160) parts[parts.length - 1] = `${last} ${sentence}`;
+    else parts.push(sentence);
+  }
+  return parts;
+}
+
 function stopSpeaking() {
+  voice.speechRun += 1;
+  voice.speech = null;
   if (canSpeak()) window.speechSynthesis.cancel();
   if (voice.listening) { voice.listening.textContent = "Listen"; voice.listening = null; }
+  paintSpeechBar();
 }
 
 function speak(text, language, button) {
   if (!canSpeak()) return;
   stopSpeaking();
-  const voiceFound = pickVoice(language);
-  if (language === "ml" && !voiceFound) {
+  const found = pickVoice(language);
+  if (language === "ml" && !found) {
     say("This computer has no Malayalam voice. Add one in Windows Settings, Time & language, Speech.");
     return;
   }
+  const parts = speechParts(text);
+  if (!parts.length) return;
   say("");
-  const utterance = new SpeechSynthesisUtterance(forSpeech(text));
-  utterance.lang = language === "ml" ? "ml-IN" : (voiceFound ? voiceFound.lang : "en-IN");
-  if (voiceFound) utterance.voice = voiceFound;
-  const done = () => { if (voice.listening === button) { button.textContent = "Listen"; voice.listening = null; } };
-  utterance.onend = done;
-  utterance.onerror = done;
+  voice.speech = { parts, index: 0, language, found, paused: false };
   if (button) { button.textContent = "Stop"; voice.listening = button; }
+  speakNextPart();
+  paintSpeechBar();
+}
+
+function speakNextPart() {
+  const speech = voice.speech;
+  if (!speech || speech.paused) return;
+  if (speech.index >= speech.parts.length) { stopSpeaking(); return; }
+  const run = ++voice.speechRun;
+  const utterance = new SpeechSynthesisUtterance(speech.parts[speech.index]);
+  utterance.lang = speech.language === "ml" ? "ml-IN" : (speech.found ? speech.found.lang : "en-IN");
+  if (speech.found) utterance.voice = speech.found;
+  utterance.onend = () => { if (run === voice.speechRun) { speech.index += 1; speakNextPart(); } };
+  utterance.onerror = () => { if (run === voice.speechRun) stopSpeaking(); };
   window.speechSynthesis.speak(utterance);
+}
+
+// Pause cancels and remembers the sentence: speechSynthesis.pause() is unreliable in Chrome.
+function pauseSpeaking() {
+  if (!voice.speech) return;
+  voice.speech.paused = true;
+  voice.speechRun += 1;
+  window.speechSynthesis.cancel();
+  paintSpeechBar();
+}
+
+function resumeSpeaking() {
+  if (!voice.speech) return;
+  voice.speech.paused = false;
+  speakNextPart();
+  paintSpeechBar();
+}
+
+function speechControls() {
+  const pause = h("button", { class: "btn ghost", type: "button", "data-role": "pause" }, "Pause");
+  pause.addEventListener("click", () => (voice.speech && voice.speech.paused ? resumeSpeaking() : pauseSpeaking()));
+  const stop = h("button", { class: "btn ghost", type: "button" }, "Stop reading");
+  stop.addEventListener("click", stopSpeaking);
+  return h("div", { class: "composer-meta speech-bar", hidden: true },
+    h("span", { class: "hint", "data-role": "status" }), pause, stop);
+}
+
+function paintSpeechBar() {
+  const bar = ui.speechBar;
+  if (!bar || !bar.isConnected) return;
+  const speech = voice.speech;
+  bar.hidden = !speech;
+  if (!speech) return;
+  bar.querySelector("[data-role=pause]").textContent = speech.paused ? "Resume" : "Pause";
+  bar.querySelector("[data-role=status]").textContent = speech.paused ? "Paused" : "Reading the answer aloud…";
 }
 
 function listenButton(text) {
@@ -524,7 +590,8 @@ async function toggleRecording() {
   }
   voice.chunks = [];
   voice.discard = false;
-  voice.recorder = new MediaRecorder(voice.stream);
+  // A higher bitrate than the browser default keeps consonants clear for the speech model.
+  voice.recorder = new MediaRecorder(voice.stream, { audioBitsPerSecond: 128000 });
   voice.recorder.addEventListener("dataavailable", (event) => { if (event.data.size) voice.chunks.push(event.data); });
   voice.recorder.addEventListener("stop", finishRecording);
   voice.recorder.start();

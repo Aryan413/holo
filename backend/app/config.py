@@ -43,11 +43,13 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 120  # local models on a laptop CPU can be slow
 
     # Speech to text for the microphone button (needs `pip install -r requirements-voice.txt`).
-    # Model sizes: tiny, base, small (default), medium, large-v3. Bigger = more accurate, slower,
+    # Model sizes: tiny, base, small, medium, large-v3. Bigger = more accurate, slower,
     # and the only realistic choice for Malayalam. Downloaded once on first use.
-    whisper_model: str = "small"
-    whisper_device: str = "cpu"  # "cuda" uses the NVIDIA graphics card (needs CUDA libraries)
-    whisper_compute_type: str = "int8"  # use "float16" with cuda
+    # "auto" everywhere = large-v3 on an NVIDIA card when the CUDA libraries are there
+    # (requirements-voice-gpu.txt), otherwise small on the CPU.
+    whisper_model: str = "auto"
+    whisper_device: str = "auto"  # auto, cpu or cuda
+    whisper_compute_type: str = "auto"  # auto, int8 (cpu), float16 or int8_float16 (cuda)
     max_audio_mb: int = 10
 
     @property

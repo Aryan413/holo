@@ -91,9 +91,22 @@ pip install -r requirements-voice.txt
 ```
 
 Restart the server. The first time someone presses Speak, the speech model downloads (needs internet, a few hundred MB for
-`small`). Settings in `.env`: `WHISPER_MODEL` (`tiny`, `base`, `small`, `medium`, `large-v3`), `WHISPER_DEVICE` (`cpu` or
-`cuda`), `WHISPER_COMPUTE_TYPE` (`int8` for cpu, `float16` for cuda). Use `small` to start. Malayalam needs `medium` or
-`large-v3` to be usable, and even then it is much weaker than English.
+`small`, about 3 GB for `large-v3`).
+
+**Have an NVIDIA graphics card? Use it: far fewer misheard words.** Also run
+
+```powershell
+pip install -r requirements-voice-gpu.txt
+```
+
+With the default `auto` settings the server then uses `large-v3` (the most accurate model, and the only one that is
+usable for Malayalam) on the card, and falls back to `small` on the CPU when there is no card or the CUDA libraries are
+missing. The server log says which one it loaded. Settings in `.env`, all `auto` by default: `WHISPER_MODEL` (`tiny`,
+`base`, `small`, `medium`, `large-v3`), `WHISPER_DEVICE` (`cpu` or `cuda`), `WHISPER_COMPUTE_TYPE` (`int8` for cpu,
+`float16` or `int8_float16` for cuda).
+
+Whisper is also told not to feed its own earlier text back in (one misheard word used to repeat or snowball), and pieces
+it judges to be noise rather than speech are dropped (no more "Thank you for watching." from a silent clip).
 
 **Course terms are spelled using the notes.** Each note's first heading (`# Ohm's law`, `# Kirchhoff's laws`) is passed to
 Whisper as a hint, so a quiet "What is Ohm's law?" is no longer heard as "What is owns a lot?". Give every note a clear
