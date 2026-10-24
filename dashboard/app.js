@@ -418,7 +418,7 @@ const voice = {
   phase: "idle", // idle | recording | transcribing
   recorder: null, stream: null, chunks: [], timer: null, seconds: 0, discard: false,
   listening: null, // the Listen button that is currently speaking
-  speech: null, // the answer being read: { parts, index, language, found, paused }
+  speech: null, // the answer being read: { parts, index, offset (char in that part), language, found, paused }
   speechRun: 0, // bumped on pause/stop so events from a cancelled sentence are ignored
 };
 
@@ -451,12 +451,76 @@ function say(message) {
 
 /* --- spoken answers (the browser's own voices, no server needed) --- */
 
-function forSpeech(text) {
+// Speech engines read symbols literally ("slash", "caret", "backslash frac"), so formulas are
+// turned into words first: "V = I/R" -> "V equals I divided by R".
+const LATEX_WORDS = {
+  times: " times ", cdot: " times ", div: " divided by ", pm: " plus or minus ", approx: " is approximately ",
+  neq: " is not equal to ", ne: " is not equal to ", leq: " is less than or equal to ", le: " is less than or equal to ",
+  geq: " is greater than or equal to ", ge: " is greater than or equal to ", Omega: " ohms ", infty: " infinity ",
+  rightarrow: " gives ", to: " to ", left: " ", right: " ", quad: " ", qquad: " ",
+};
+
+function latexForSpeech(text) {
+  let t = text.replace(/\\\(|\\\)|\\\[|\\\]|\$\$?/g, " ");
+  for (let i = 0; i < 5; i += 1) { // fractions inside fractions
+    const next = t.replace(/\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, " $1 divided by $2 ");
+    if (next === t) break;
+    t = next;
+  }
+  return t
+    .replace(/\\sqrt\s*\{([^{}]*)\}/g, " square root of $1 ")
+    .replace(/\\(?:text|mathrm|mathbf|operatorname)\s*\{([^{}]*)\}/g, "$1")
+    .replace(/\\([A-Za-z]+)/g, (_, name) => LATEX_WORDS[name] ?? ` ${name} `) // \alpha -> alpha
+    .replace(/\\./g, " "); // spacing commands like \, and stray backslashes
+}
+
+const UNITS = { "kΩ": "kilo-ohms", "mA": "milliamps", "kV": "kilovolts", Hz: "hertz", "Ω": "ohms", V: "volts", A: "amps", W: "watts" };
+
+function mathForSpeech(text) {
   return text
+    .replace(/^\s*[-*•]\s+/gm, "") // list bullets, so they aren't read as "minus"
+    .replace(/\b([fghuvy])('{0,2})\(([^()]{1,15})\)/g, "$1$2 of $3") // f(x) -> f of x
+    .replace(/(?<![A-Za-z])([A-HJ-Za-z])''/g, "$1 double prime ")
+    .replace(/(?<![A-Za-z])([A-HJ-Za-z])'(?!(?:s|t|d|m|ll|ve|re)\b)/g, "$1 prime ") // u' -> u prime, not "it's"
+    .replace(/(?<![A-Za-z])([a-z]{2})'(?=[\s)\]]|$)/g, "$1 prime ") // uv' -> uv prime, not "students'"
+    .replace(/\^\s*2(?!\d)/g, " squared")
+    .replace(/\^\s*3(?!\d)/g, " cubed")
+    .replace(/\^\s*\(?([^\s)]+)\)?/g, " to the power of $1")
+    .replace(/((?<![A-Za-z])[A-Za-z]|\d|\))\s+-\s+(?=[0-9A-Za-z(])/g, "$1 minus ") // 2x - x, not "well - known"
+    .replace(/−(?=\s?\d)/g, " minus ") // the maths minus sign (not "–", which marks ranges)
+    .replace(/(\d)\s?(kΩ|mA|kV|Hz|Ω|V|A|W)(?![A-Za-z])/g, (_, n, unit) => `${n} ${UNITS[unit]}`)
+    .replace(/Ω/g, " ohms ")
+    .replace(/\band\/or\b/gi, "and or")
+    .replace(/([A-Za-z]{3,})\/([A-Za-z]{3,})/g, "$1 or $2") // input/output
+    .replace(/\s*[/÷]\s*/g, " divided by ")
+    .replace(/\s*[×∗·]\s*|\s+\*\s+|(?<=\d)\*(?=\d)/g, " times ")
+    .replace(/\s*\+\s*/g, " plus ")
+    .replace(/\s*±\s*/g, " plus or minus ")
+    .replace(/\s*≈\s*/g, " is approximately ")
+    .replace(/\s*≠\s*/g, " is not equal to ")
+    .replace(/\s*≤\s*/g, " is less than or equal to ")
+    .replace(/\s*≥\s*/g, " is greater than or equal to ")
+    .replace(/\s+<\s+/g, " is less than ")
+    .replace(/\s+>\s+/g, " is greater than ")
+    .replace(/\s*=\s*/g, " equals ")
+    .replace(/√\s*/g, " square root of ")
+    .replace(/°C\b/g, " degrees Celsius")
+    .replace(/°/g, " degrees")
+    .replace(/π/g, " pi ")
+    .replace(/Δ\s*/g, " delta ")
+    .replace(/\s*→\s*/g, " gives ");
+}
+
+function forSpeech(text, language = "en") {
+  let t = text
     .replace(/```[\s\S]*?```/g, " code block. ")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`#>~|]/g, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1");
+  t = latexForSpeech(t);
+  if (language !== "ml") t = mathForSpeech(t); // the spoken words are English
+  return t
+    .replace(/[*_`#>~|\\{}]/g, "")
     .replace(/\s+/g, " ")
+    .replace(/\s+([.,!?;:])/g, "$1")
     .trim();
 }
 
@@ -469,8 +533,9 @@ function pickVoice(language) {
 
 // Read sentence by sentence: browsers cut off long single utterances (Chrome after ~15 s),
 // and Pause can then stop between sentences and Resume carry on from the same one.
-function speechParts(text) {
-  const sentences = forSpeech(text).match(/[^.!?।]+[.!?।]*/g) || [];
+function speechParts(text, language) {
+  // Split only where a full stop is followed by a space, so "2.25" stays one number.
+  const sentences = forSpeech(text, language).split(/(?<=[.!?।])\s+/);
   const parts = [];
   for (const sentence of sentences.map((s) => s.trim()).filter(Boolean)) {
     const last = parts[parts.length - 1];
@@ -496,10 +561,10 @@ function speak(text, language, button) {
     say("This computer has no Malayalam voice. Add one in Windows Settings, Time & language, Speech.");
     return;
   }
-  const parts = speechParts(text);
+  const parts = speechParts(text, language);
   if (!parts.length) return;
   say("");
-  voice.speech = { parts, index: 0, language, found, paused: false };
+  voice.speech = { parts, index: 0, offset: 0, language, found, paused: false };
   if (button) { button.textContent = "Stop"; voice.listening = button; }
   speakNextPart();
   paintSpeechBar();
@@ -510,10 +575,15 @@ function speakNextPart() {
   if (!speech || speech.paused) return;
   if (speech.index >= speech.parts.length) { stopSpeaking(); return; }
   const run = ++voice.speechRun;
-  const utterance = new SpeechSynthesisUtterance(speech.parts[speech.index]);
+  const start = speech.offset; // 0, or the word Pause stopped on
+  const utterance = new SpeechSynthesisUtterance(speech.parts[speech.index].slice(start));
   utterance.lang = speech.language === "ml" ? "ml-IN" : (speech.found ? speech.found.lang : "en-IN");
   if (speech.found) utterance.voice = speech.found;
-  utterance.onend = () => { if (run === voice.speechRun) { speech.index += 1; speakNextPart(); } };
+  // Remember the word being read, so Resume carries on from it instead of the start of the sentence.
+  utterance.onboundary = (event) => {
+    if (run === voice.speechRun && event.name === "word") speech.offset = start + event.charIndex;
+  };
+  utterance.onend = () => { if (run === voice.speechRun) { speech.index += 1; speech.offset = 0; speakNextPart(); } };
   utterance.onerror = () => { if (run === voice.speechRun) stopSpeaking(); };
   window.speechSynthesis.speak(utterance);
 }
