@@ -514,7 +514,10 @@ async function toggleRecording() {
   stopSpeaking();
   say("");
   try {
-    voice.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Ask for the browser's clean-up: quiet laptop mics and fan noise are the usual cause of misheard words.
+    voice.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+    });
   } catch {
     say("The microphone is blocked. Allow it with the lock icon next to the address, then try again.");
     return;

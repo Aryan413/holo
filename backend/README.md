@@ -95,5 +95,10 @@ Restart the server. The first time someone presses Speak, the speech model downl
 `cuda`), `WHISPER_COMPUTE_TYPE` (`int8` for cpu, `float16` for cuda). Use `small` to start. Malayalam needs `medium` or
 `large-v3` to be usable, and even then it is much weaker than English.
 
+**Course terms are spelled using the notes.** Each note's first heading (`# Ohm's law`, `# Kirchhoff's laws`) is passed to
+Whisper as a hint, so a quiet "What is Ohm's law?" is no longer heard as "What is owns a lot?". Give every note a clear
+title heading; Malayalam titles help Malayalam speech the same way. On noisy test recordings this took `small` from about
+88% to 100% of words right, with no extra time.
+
 Without the extra install the rest of the app works, and the Speak button shows a message saying what to install.
 The microphone only works on `http://127.0.0.1:8000` or `localhost` (or https), not on a plain network address.

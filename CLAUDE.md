@@ -47,7 +47,7 @@ holo/
 - `app/routers/quiz.py`: `/quizzes` (teachers create; students list, fetch and attempt). Students never receive `correct_index`.
 - `app/routers/dashboard.py`: `/dashboard/summary` (teachers only).
 - `app/services/llm.py`: AI providers: `echo` (dev placeholder, only repeats the question), `anthropic`, `ollama`, `lmstudio`, `openai_compatible`. Chosen with `LLM_PROVIDER`.
-- `app/routers/voice.py` and `app/services/stt.py`: `POST /voice/transcribe` turns a recording into text with faster-whisper (optional install: `requirements-voice.txt`; `WHISPER_*` settings). Missing install gives a 503 with instructions.
+- `app/routers/voice.py` and `app/services/stt.py`: `POST /voice/transcribe` turns a recording into text with faster-whisper (optional install: `requirements-voice.txt`; `WHISPER_*` settings). Missing install gives a 503 with instructions. The note titles (first heading of each note, via `holox_ai` `Retriever.topics()`) are sent to Whisper as a vocabulary hint so course terms are spelled right.
 - `app/services/rag.py`: wraps `holox_ai`. If the engine is missing or fails it returns no notes rather than crashing.
 - `tests/`: pytest suite (in-memory SQLite). Run from `backend/`.
 

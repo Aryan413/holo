@@ -3,15 +3,37 @@ and the microphone button then explains what to install."""
 
 import logging
 import os
+import re
 import tempfile
 import threading
 from typing import Protocol
 
 from ..config import settings
+from .rag import list_topics
 
 logger = logging.getLogger("uvicorn.error")
 
 LANGUAGES = {"en", "ml"}
+MALAYALAM = re.compile(r"[ഀ-ൿ]")
+MAX_PROMPT_CHARS = 600  # Whisper only reads the last ~224 tokens of a prompt
+
+
+def vocabulary_prompt(language: str) -> str | None:
+    """The course note titles in the spoken language, e.g. "Topics: Kirchhoff's laws, Ohm's law."
+    Without them Whisper guesses at course terms in quiet or noisy recordings
+    ("What is owns a lot?"); with them it spells them right. None when there are no notes."""
+    topics = [t for t in list_topics() if bool(MALAYALAM.search(t)) == (language == "ml")]
+    picked: list[str] = []
+    length = 0
+    for topic in topics:
+        if length + len(topic) + 2 > MAX_PROMPT_CHARS:
+            break
+        picked.append(topic)
+        length += len(topic) + 2
+    if not picked:
+        return None
+    joined = ", ".join(picked)
+    return f"Topics: {joined}." if language == "en" else f"{joined}."
 
 
 class SpeechUnavailable(Exception):
@@ -64,7 +86,11 @@ class WhisperTranscriber:
             with os.fdopen(fd, "wb") as handle:
                 handle.write(audio)
             segments, _info = model.transcribe(
-                path, language=language, vad_filter=True, beam_size=5
+                path,
+                language=language,
+                vad_filter=True,
+                beam_size=5,
+                initial_prompt=vocabulary_prompt(language),
             )
             return " ".join(segment.text.strip() for segment in segments).strip()
         finally:

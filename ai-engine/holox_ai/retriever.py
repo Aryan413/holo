@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .bm25 import BM25
-from .loader import Chunk, list_note_files, load_chunks
+from .loader import Chunk, list_note_files, load_chunks, note_title
 from .tokenizer import tokenize
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ class Retriever:
         self._lock = threading.Lock()
         self._signature: tuple = ()
         self._state: tuple[list[Chunk], BM25] = ([], BM25([]))
+        self._topics: list[str] = []
         self._rebuild(self._current_signature())
 
     # ----- index maintenance -----
@@ -53,6 +54,8 @@ class Retriever:
     def _rebuild(self, signature: tuple) -> None:
         chunks = load_chunks(self.notes_dir, self.max_words)
         index = BM25([tokenize(f"{c.heading} {c.text}") for c in chunks])
+        titles = (note_title(path) for path in list_note_files(self.notes_dir))
+        self._topics = list(dict.fromkeys(title for title in titles if title))
         self._state = (chunks, index)
         self._signature = signature
         logger.info("Indexed %d note chunks from %s", len(chunks), self.notes_dir)
@@ -69,6 +72,12 @@ class Retriever:
         self.refresh()
         chunks, _ = self._state
         return sorted({c.subject for c in chunks}, key=str.lower)
+
+    def topics(self) -> list[str]:
+        """Note titles (the first heading of each file), such as "Kirchhoff's laws".
+        Speech recognition uses them to spell course terms correctly."""
+        self.refresh()
+        return list(self._topics)
 
     # ----- searching -----
     def _candidates(self, chunks: list[Chunk], subject: str | None) -> list[int]:

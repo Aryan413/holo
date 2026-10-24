@@ -29,6 +29,17 @@ def list_subjects() -> list[str]:
         return []
 
 
+def list_topics() -> list[str]:
+    """Titles of the course notes, e.g. "Ohm's law". Used to help speech recognition."""
+    if get_retriever is None:
+        return []
+    try:
+        return get_retriever(settings.notes_dir or None).topics()
+    except Exception:
+        logger.exception("Could not list note topics")
+        return []
+
+
 def retrieve(subject: str, query: str, k: int = 4) -> list[str]:
     """Return up to k relevant note snippets, best first. Returns [] when nothing matches."""
     if get_retriever is None:
