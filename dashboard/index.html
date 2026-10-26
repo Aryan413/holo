@@ -12,5 +12,16 @@
   <div id="root"><p class="boot">Loading…</p></div>
   <noscript><p class="boot">Mentora needs JavaScript. Turn it on in your browser, then reload this page.</p></noscript>
   <script src="app.js"></script>
+  <!-- The 3D tutor character. Libraries are local copies (vendor/), so it works offline with no build step. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.min.js",
+        "three/addons/": "./vendor/three/addons/",
+        "@pixiv/three-vrm": "./vendor/three-vrm/three-vrm.module.min.js"
+      }
+    }
+  </script>
+  <script type="module" src="avatar.js"></script>
 </body>
 </html>

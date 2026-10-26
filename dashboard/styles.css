@@ -199,8 +199,51 @@ main > h2 { margin-bottom: 1.25rem; }
   border-radius: 50%; background: var(--bad); animation: pulse 1.2s ease-in-out infinite;
 }
 
+/* ---------- the 3D tutor beside the chat (avatar.js) ---------- */
+main:has(.tutor.has-stage) { max-width: 92rem; }
+.tutor { position: relative; }
+.tutor.has-stage { grid-template-columns: 14rem minmax(0, 1fr) minmax(16rem, 22rem); }
+.tutor-stage {
+  position: relative;
+  align-self: start;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #3c5a78;
+  /* a dark projection stage, lit from below like the hologram display */
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 100%, rgba(120, 200, 240, .28), transparent 70%),
+    linear-gradient(to bottom, #0f0c1f, #1c1733);
+}
+.tutor-stage::after { /* faint scan lines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(158, 208, 230, .045) 0 1px, transparent 1px 3px);
+}
+.tutor-stage canvas { display: block; width: 100%; height: 100%; }
+.stage-note {
+  position: absolute; left: 0; right: 0; bottom: 1rem;
+  padding: 0 1rem; text-align: center; font-size: .9rem; color: #b3abd0;
+}
+
+@media (max-width: 1100px) { /* not enough width for a third column: a small floating window instead */
+  .tutor.has-stage { grid-template-columns: 14rem minmax(0, 1fr); }
+  .tutor-stage {
+    position: absolute; top: 0; right: 0; z-index: 2;
+    width: 9rem; height: auto;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .45);
+  }
+  .tutor.has-stage .transcript { padding-right: 10rem; } /* the chat text stays clear of the window */
+}
+
 @media (max-width: 760px) {
-  .tutor { grid-template-columns: 1fr; height: auto; gap: 1rem; }
+  .tutor.has-stage, .tutor { grid-template-columns: 1fr; height: auto; gap: 1rem; }
+  /* phones: the tutor sits in the page above the chat instead of floating over it */
+  .tutor-stage { position: relative; order: 1; justify-self: center; width: 9rem; }
+  .tutor .chat { order: 2; }
+  .tutor.has-stage .transcript { padding-right: 0; }
   .transcript { overflow: visible; }
   .turn { grid-template-columns: 1fr; gap: .25rem; }
   .composer { position: sticky; bottom: 0; padding-bottom: .75rem; }
