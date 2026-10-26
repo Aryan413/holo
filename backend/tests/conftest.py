@@ -30,6 +30,7 @@ def client(monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(settings, "teacher_signup_code", TEACHER_CODE)
     monkeypatch.setattr(settings, "llm_provider", "echo")
+    monkeypatch.setattr(settings, "tts_provider", "browser")  # never call ElevenLabs from tests
 
     # Not used as a context manager on purpose: that would run the app's startup
     # hook against the real database file.

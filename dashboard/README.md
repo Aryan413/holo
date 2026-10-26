@@ -28,8 +28,10 @@ Then open <http://127.0.0.1:8000/>.
 - **Voice:** press *Speak*, ask your question, press *Stop*. Answers are read aloud automatically (untick *Read answers
   aloud* to turn it off); while one is being read, *Pause*/*Resume* and *Stop reading* appear above the question box.
   Every reply also has a *Listen* button. Speaking needs the optional speech install, see `backend/README.md`.
+  Answers are read with the computer's own voice, or with a realistic ElevenLabs voice when the backend has
+  `TTS_PROVIDER=elevenlabs` (falls back to the computer's voice if that fails).
   *Resume* carries on from the word where it paused. Formulas are read as words (`V = I/R` is read "V equals I divided
-  by R", `x^2` "x squared", `9V` "9 volts", LaTeX like `\frac{V}{R}` too) by `forSpeech()` in `app.js`.
+  by R", `x^2` "x squared", `9V` "9 volts", LaTeX like `\frac{V}{R}` too) by `forSpeech()` in `app.js`, for both voices.
 
 ## Files
 

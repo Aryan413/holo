@@ -68,6 +68,16 @@ class SessionDetail(SessionOut):
     messages: list[MessageOut]
 
 
+# ---------- voice ----------
+class SpeakRequest(BaseModel):
+    text: str = Field(min_length=1)  # upper limit is MAX_SPEECH_CHARS, checked in the router
+    language: Literal["en", "ml"] = "en"
+    # The text read just before and after this piece. Not spoken; it keeps the tone and
+    # pacing the same across pieces so the joins don't sound like a new recording.
+    previous_text: str = Field(default="", max_length=1000)
+    next_text: str = Field(default="", max_length=1000)
+
+
 # ---------- quizzes ----------
 class QuestionCreate(BaseModel):
     text: str = Field(min_length=1)
