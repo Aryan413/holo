@@ -36,11 +36,11 @@ holo/
 └── CLAUDE.md         This file
 ```
 
-### `backend/` (FastAPI, SQLAlchemy 2, SQLite by default)
+### `backend/` (FastAPI, SQLAlchemy 2, SQLite by default, PostgreSQL for the shared team database)
 
 - `app/main.py`: creates the app, CORS, routers, `/health`, and serves `dashboard/` at `/`.
 - `app/config.py`: all settings, read from environment variables or `backend/.env` (pydantic-settings). Validates the AI provider settings at startup and refuses the dev JWT secret in production.
-- `app/models.py`, `app/schemas.py`, `app/database.py`: tables, request/response shapes, DB session. Tables are created on startup (Alembic migrations are a later step).
+- `app/models.py`, `app/schemas.py`, `app/database.py`: tables, request/response shapes, DB session. Tables are created on startup (Alembic migrations are a later step). `DATABASE_URL` is `sqlite:///./holox.db` (one computer) or the team's shared PostgreSQL on Neon, pasted as `postgresql://...` (mapped to the psycopg driver; connections pre-pinged and recycled). `scripts/copy_to_shared_db.py` copies a local `holox.db` into it once. The connection string is a secret: only in `.env`.
 - `app/security.py`: bcrypt password hashing and JWT tokens.
 - `app/routers/auth.py`: `/auth/register`, `/auth/login` (OAuth2 form, email goes in `username`), `/auth/me`. Roles are `student` and `teacher`; teacher sign-up needs `TEACHER_SIGNUP_CODE`.
 - `app/routers/tutor.py`: `/tutor/chat`, `/tutor/sessions`, `/tutor/sessions/{id}`, `/tutor/subjects`. If the AI call fails it returns 502 and saves nothing.
