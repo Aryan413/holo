@@ -33,11 +33,26 @@ Then open <http://127.0.0.1:8000/>.
   *Resume* carries on from the word where it paused. Formulas are read as words (`V = I/R` is read "V equals I divided
   by R", `x^2` "x squared", `9V` "9 volts", LaTeX like `\frac{V}{R}` too) by `forSpeech()` in `app.js`, for both voices.
 
+## Tutor character
+
+A 3D character (`avatar.js`, drawn with three.js and three-vrm) stands beside the tutor chat:
+
+- **Lip sync.** With the ElevenLabs voice the mouth follows the actual sound (loudness, and how "sharp" it is, measured
+  from a copy of the audio). With the computer's voice it follows the words as they are read.
+- **Expressions.** Listening while you record, eyes up while thinking, talking while reading, a smile or a sorry look
+  depending on the answer's wording, raised brows on questions. It also blinks, breathes and follows the mouse.
+- **Show tutor** (next to *Read answers aloud*) hides it. It stays out of the way on smaller screens: a small window on
+  tablets, above the chat on phones. With "reduce motion" on, it keeps still apart from the lips.
+- `app.js` only announces what is happening (`mentora:avatar` events on `window`); if 3D fails, the chat is unaffected.
+
 ## Files
 
 - `index.html` – the page shell
 - `styles.css` – look and feel (dark by default, follows the computer's light setting)
 - `app.js` – sign-in, tutor, quizzes, teacher screens; talks to the backend API
+- `avatar.js` – the 3D tutor character beside the chat (see below)
+- `models/tutor.vrm` – the character (Git LFS); `models/README.md` says how to swap it and credits it
+- `vendor/` – local copies of three.js and three-vrm, loaded through the import map in `index.html`
 
 ## Notes
 

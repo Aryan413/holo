@@ -62,12 +62,13 @@ holo/
 
 ### `dashboard/` (web app)
 
-- Plain HTML, CSS and JavaScript: `index.html`, `styles.css`, `app.js`. **No build step, no npm, no framework.**
+- Plain HTML, CSS and JavaScript: `index.html`, `styles.css`, `app.js`, `avatar.js`. **No build step, no npm, no framework.** The only libraries are local copies of three.js and three-vrm in `dashboard/vendor/` (versions in its README), used by the tutor character.
 - Served by the backend at http://127.0.0.1:8000/ (it is mounted last in `main.py`, so API routes win).
 - Student tabs: Tutor, Quizzes. Teacher tabs: Overview, Tutor, Quizzes, New quiz.
 - Text from the server is always inserted with `textContent` (never `innerHTML`). Keep it that way.
 - The sign-in token lives in `sessionStorage`. System fonts only, so it works offline.
 - Voice: the Speak button records with `MediaRecorder` and posts to `/voice/transcribe`; spoken answers use the browser's `speechSynthesis` (no server), read sentence by sentence so Pause/Resume work, and are on by default. A speech failure must never discard a received answer.
+- Tutor character: `avatar.js` draws `models/tutor.vrm` (a VRM model, Git LFS) beside the chat, with lip sync (audio analysis for ElevenLabs, word timings for the browser voice) and expressions by state. `app.js` only dispatches `mentora:avatar` events (`avatarCue()`); the character must never be able to break the chat.
 
 ### `avatar-unity/`
 
@@ -113,7 +114,7 @@ The tutor is deliberately in **open mode**: it answers any question, and course 
 1. **Never commit straight to `main`.** Make a branch (`feature/<short-name>`), push it, open a pull request, get one teammate to review. See `CONTRIBUTING.md`.
 2. **Never commit secrets.** `.env`, API keys, `*.db` files and virtual environments are git-ignored; keep it that way. Use `.env.example` to document new settings (with fake values).
 3. **Add or update tests** when you change backend or engine behaviour, and run them before you commit.
-4. **Keep the existing style.** Python 3.11+ with type hints, small modules, clear names. The web app stays dependency-free.
+4. **Keep the existing style.** Python 3.11+ with type hints, small modules, clear names. The web app stays build-free: no npm, no bundler; libraries only as pinned local copies in `dashboard/vendor/`.
 5. **Large binary files** (models, audio, video) go through Git LFS; the patterns are in `.gitattributes`.
 6. **Do not weaken security** to make something work: keep the 72-byte bcrypt check, the role checks, the production secret check, and hiding `correct_index` from students.
 7. **Update the README** of the folder you changed when you add something someone else needs to run.

@@ -272,9 +272,10 @@ function viewTutor(main) {
     : null;
   const voiceNote = h("p", { class: "hint voice-note", role: "status" });
   const speechBar = speechControls();
+  const stage = h("aside", { class: "tutor-stage", "aria-label": "Mentora, the tutor character", hidden: !voice.showTutor });
   const form = h("form", { class: "composer" }, meta, voiceOptions(), speechBar,
     h("div", { class: "composer-row" }, input, mic, send), voiceNote);
-  Object.assign(ui, { sessionsList, transcript, meta, input, send, mic, voiceNote, form, speechBar });
+  Object.assign(ui, { sessionsList, transcript, meta, input, send, mic, voiceNote, form, speechBar, stage });
   paintSpeechBar();
 
   form.addEventListener("submit", (event) => {
@@ -292,7 +293,9 @@ function viewTutor(main) {
     }
   });
 
-  main.replaceChildren(h("div", { class: "tutor" }, sidebar, h("section", { class: "chat" }, transcript, form)));
+  main.replaceChildren(h("div", { class: `tutor${voice.showTutor ? " has-stage" : ""}` },
+    sidebar, h("section", { class: "chat" }, transcript, form), stage));
+  if (voice.showTutor) avatarCue("mount", { element: stage });
   paintTutor();
   loadSessions();
 }
@@ -387,6 +390,7 @@ async function ask(text) {
   stopSpeaking();
   chat.turns.push({ who: "you", text }, { who: "tutor", text: "", pending: true });
   paintTutor();
+  avatarCue("thinking");
   try {
     const reply = await api("/tutor/chat", {
       method: "POST",
@@ -394,6 +398,7 @@ async function ask(text) {
     });
     chat.id = reply.session_id;
     chat.turns[chat.turns.length - 1] = { who: "tutor", text: reply.reply };
+    avatarCue("answer", { text: reply.reply });
     loadSessions();
     if (voice.readAloud && state.chat === chat && state.view === "tutor") {
       // Never let a speech problem throw away an answer that arrived fine.
@@ -401,6 +406,7 @@ async function ask(text) {
     }
   } catch (problem) {
     chat.turns.splice(-2, 2); // drop the unanswered question; it goes back in the box to resend
+    avatarCue("oops");
     chat.error = problem.message;
     if (state.chat === chat && ui.input) ui.input.value = text;
   } finally {
@@ -414,6 +420,7 @@ async function ask(text) {
 const MAX_RECORDING_SECONDS = 60;
 const voice = {
   readAloud: loadPref("mentora.readAloud", true),
+  showTutor: loadPref("mentora.showTutor", true),
   sendAfter: loadPref("mentora.sendAfter", false),
   phase: "idle", // idle | recording | transcribing
   recorder: null, stream: null, chunks: [], timer: null, seconds: 0, discard: false,
@@ -432,6 +439,11 @@ function savePref(key, value) {
   try { localStorage.setItem(key, value ? "1" : "0"); } catch { /* preferences just won't be remembered */ }
 }
 
+// Tells the 3D tutor beside the chat (avatar.js) what is happening. Nothing here depends on it.
+function avatarCue(type, detail = {}) {
+  window.dispatchEvent(new CustomEvent("mentora:avatar", { detail: { type, ...detail } }));
+}
+
 const canRecord = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 const canSpeak = () => "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
@@ -445,7 +457,19 @@ function voiceOptions() {
   const options = [];
   if (canSpeak()) options.push(option("Read answers aloud", "mentora.readAloud", "readAloud"));
   if (canRecord()) options.push(option("Send right after speaking", "mentora.sendAfter", "sendAfter"));
+  options.push(h("label", { class: "choice" },
+    h("input", { type: "checkbox", checked: voice.showTutor, onchange: (event) => showTutor(event.target.checked) }),
+    h("span", {}, "Show tutor")));
   return h("div", { class: "composer-meta voice-options", hidden: options.length === 0 }, options);
+}
+
+function showTutor(show) {
+  voice.showTutor = show;
+  savePref("mentora.showTutor", show);
+  if (!ui.stage || !ui.stage.isConnected) return;
+  ui.stage.hidden = !show;
+  ui.stage.parentElement.classList.toggle("has-stage", show);
+  if (show) avatarCue("mount", { element: ui.stage });
 }
 
 function say(message) {
@@ -616,6 +640,7 @@ function stopSpeaking() {
   voice.speech = null;
   if (voice.audio) { voice.audio.pause(); voice.audio = null; }
   if (canSpeak()) window.speechSynthesis.cancel();
+  avatarCue("speech-stop");
   if (voice.listening) { voice.listening.textContent = "Listen"; voice.listening = null; }
   paintSpeechBar();
 }
@@ -652,6 +677,7 @@ async function playServerPart(speech, run) {
     audio.addEventListener("ended", () => { if (current()) { speech.index += 1; speakNextPart(); } });
     audio.addEventListener("error", () => { if (current()) fallBackToBrowser(speech); });
     voice.audio = audio;
+    avatarCue("speech-audio", { audio, text: speech.parts[speech.index] });
     if (speech.index + 1 < speech.parts.length) {
       speechAudio(speech, speech.index + 1).catch(() => {}); // ready before this part ends
     }
@@ -690,8 +716,11 @@ function speakNextPart() {
   utterance.lang = speech.language === "ml" ? "ml-IN" : (speech.found ? speech.found.lang : "en-IN");
   if (speech.found) utterance.voice = speech.found;
   // Remember the word being read, so Resume carries on from it instead of the start of the sentence.
+  utterance.onstart = () => { if (run === voice.speechRun) avatarCue("speech-part", { text: utterance.text }); };
   utterance.onboundary = (event) => {
-    if (run === voice.speechRun && event.name === "word") speech.offset = start + event.charIndex;
+    if (run !== voice.speechRun || event.name !== "word") return;
+    speech.offset = start + event.charIndex;
+    avatarCue("word", { text: utterance.text, charIndex: event.charIndex });
   };
   utterance.onend = () => { if (run === voice.speechRun) { speech.index += 1; speech.offset = 0; speakNextPart(); } };
   utterance.onerror = () => { if (run === voice.speechRun) stopSpeaking(); };
@@ -704,6 +733,7 @@ function pauseSpeaking() {
   const speech = voice.speech;
   if (!speech) return;
   speech.paused = true;
+  avatarCue("speech-pause");
   if (speech.server) {
     if (voice.audio) voice.audio.pause();
   } else {
@@ -717,6 +747,7 @@ function resumeSpeaking() {
   const speech = voice.speech;
   if (!speech) return;
   speech.paused = false;
+  avatarCue("speech-resume");
   if (!speech.server) speakNextPart();
   else if (voice.audio) voice.audio.play().catch(() => { if (voice.speech === speech) fallBackToBrowser(speech); });
   // else the part is still downloading and starts by itself now that it isn't paused
@@ -754,6 +785,7 @@ function listenButton(text) {
 /* --- spoken questions (recorded here, turned into text by the backend) --- */
 
 function paintMic() {
+  avatarCue(voice.phase === "recording" ? "listening" : voice.phase === "transcribing" ? "transcribing" : "mic-idle");
   const mic = ui.mic;
   if (!mic || !mic.isConnected) return;
   mic.dataset.state = voice.phase;
@@ -841,6 +873,7 @@ function stopVoice() {
   }
   releaseMicrophone();
   if (voice.phase === "recording") voice.phase = "idle";
+  avatarCue("mic-idle");
 }
 
 /* ---------- quizzes ---------- */
