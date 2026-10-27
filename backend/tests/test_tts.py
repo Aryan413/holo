@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import httpx
 import pytest
 from pydantic import ValidationError
@@ -132,7 +134,7 @@ def capture_post(monkeypatch, response):
         calls.append({"url": url, "params": params, "headers": headers, "json": json, "timeout": timeout})
         return response
 
-    monkeypatch.setattr("app.services.tts.httpx.post", post)
+    monkeypatch.setattr("app.services.tts._http", lambda: SimpleNamespace(post=post))
     return calls
 
 
@@ -179,7 +181,7 @@ def test_elevenlabs_unreachable(monkeypatch):
     def post(*args, **kwargs):
         raise httpx.ConnectError("no network")
 
-    monkeypatch.setattr("app.services.tts.httpx.post", post)
+    monkeypatch.setattr("app.services.tts._http", lambda: SimpleNamespace(post=post))
     with pytest.raises(VoiceUnavailable, match="internet"):
         ElevenLabsSpeaker("k", "v", "eleven_v4").synthesize("Hello", "en")
 
@@ -213,3 +215,25 @@ def test_unknown_tts_provider_is_refused():
 def test_voice_id_must_be_an_id(voice_id):
     with pytest.raises(ValidationError, match="ELEVENLABS_VOICE_ID"):
         Settings(elevenlabs_voice_id=voice_id)
+
+
+def test_one_connection_is_kept_open_and_reused():
+    from app.services import tts
+
+    assert tts._http() is tts._http()
+    assert tts._http()._transport._pool._keepalive_expiry >= 60
+
+
+def test_warm_up_only_when_elevenlabs_is_on(monkeypatch):
+    from app.services import tts
+
+    started = []
+    monkeypatch.setattr(tts.threading, "Thread", lambda target, daemon: SimpleNamespace(start=lambda: started.append(1)))
+    monkeypatch.setattr(tts, "_last_warm_up", 0.0)
+    monkeypatch.setattr(settings, "tts_provider", "browser")
+    tts.warm_up()
+    assert started == []
+    monkeypatch.setattr(settings, "tts_provider", "elevenlabs")
+    tts.warm_up()
+    tts.warm_up()  # a second call within a minute does nothing
+    assert started == [1]

@@ -565,17 +565,20 @@ function pickVoice(language) {
 // Server voice: a short first part so speech starts quickly, then long parts so there are
 // few joins (each join is a new recording, which can sound like a break in the voice).
 const BROWSER_PART_CHARS = 160;
-const SERVER_FIRST_PART_CHARS = 220;
+// Server voice part sizes: about one sentence first (the voice starts ~2 s sooner), then growing,
+// so each part is generated before the one playing ends (ElevenLabs makes ~1 s + 7 ms per
+// character; speech plays ~70 ms per character), then long parts with few joins.
+const SERVER_PART_RAMP = [110, 400];
 const SERVER_PART_CHARS = 1200;
 const SPEECH_CONTEXT_CHARS = 300; // text either side sent along so the joins sound continuous
 
-function speechParts(text, language, maxChars = BROWSER_PART_CHARS, firstMaxChars = maxChars) {
+function speechParts(text, language, maxChars = BROWSER_PART_CHARS, ramp = []) {
   // Split only where a full stop is followed by a space, so "2.25" stays one number.
   const sentences = forSpeech(text, language).split(/(?<=[.!?।])\s+/);
   const parts = [];
   for (const sentence of sentences.map((s) => s.trim()).filter(Boolean)) {
     const last = parts[parts.length - 1];
-    const limit = parts.length === 1 ? firstMaxChars : maxChars;
+    const limit = ramp[parts.length - 1] ?? maxChars; // the size allowed for the part being filled
     if (last && last.length + sentence.length < limit) parts[parts.length - 1] = `${last} ${sentence}`;
     else parts.push(sentence);
   }
@@ -657,7 +660,7 @@ async function speak(text, language, button) {
     return;
   }
   const parts = server
-    ? speechParts(text, language, SERVER_PART_CHARS, SERVER_FIRST_PART_CHARS)
+    ? speechParts(text, language, SERVER_PART_CHARS, SERVER_PART_RAMP)
     : speechParts(text, language);
   if (!parts.length) return;
   say("");
