@@ -251,58 +251,6 @@ main:has(.tutor.has-stage) { max-width: 92rem; }
   .composer-row textarea { flex-basis: 100%; }
 }
 
-/* ---------- pictures with answers (visuals/solar.js) ---------- */
-.visual-slot { margin: .9rem 0 0 1rem; max-width: 68ch; }
-.visual {
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #2f3d5c;
-  background: #05040c;
-  color: #e3e8ff;
-  font-family: var(--sans);
-}
-.visual .stage { position: relative; aspect-ratio: 16 / 10; }
-.visual .stage canvas, .visual .stage .still { display: block; width: 100%; height: 100%; object-fit: cover; touch-action: none; cursor: grab; }
-.visual .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.visual .labels span {
-  position: absolute; left: 0; top: 0; padding-top: 2px;
-  font-size: .72rem; color: #b8c4ea; white-space: nowrap; text-shadow: 0 0 4px #000, 0 0 2px #000;
-}
-.visual .labels span.on { color: #fff; font-weight: 700; font-size: .8rem; }
-.visual .facts {
-  position: absolute; top: .55rem; right: .55rem; width: min(17rem, 46%); max-height: calc(100% - 3.6rem); overflow: auto;
-  padding: .6rem .75rem; border-radius: 10px; background: rgba(10, 10, 28, .82); backdrop-filter: blur(4px);
-  font-size: .78rem; line-height: 1.4;
-}
-.visual .facts h4 { margin: 0 0 .15rem; font: 600 1rem var(--serif); color: #fff; }
-.visual .facts .kind { margin: 0 0 .35rem; color: #9fd4ff; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.visual .facts .note { margin: 0 0 .45rem; color: #cfd6f5; }
-.visual .facts dl { display: grid; grid-template-columns: auto 1fr; gap: .15rem .6rem; margin: 0; }
-.visual .facts dt { color: #8f9cc6; }
-.visual .facts dd { margin: 0; color: #fff; }
-.visual .facts table { width: 100%; border-collapse: collapse; font-size: .74rem; }
-.visual .facts th, .visual .facts td { padding: .2rem .3rem .2rem 0; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; vertical-align: top; }
-.visual .facts tr th:first-child { color: #8f9cc6; font-weight: 400; }
-.visual .facts .source { margin: .45rem 0 0; color: #7480a8; font-size: .68rem; }
-.visual .tools { position: absolute; left: .55rem; bottom: .55rem; display: flex; flex-wrap: wrap; gap: .35rem; }
-.visual .tools button {
-  padding: .3rem .65rem; border-radius: 99px; border: 1px solid #3a4a72; background: rgba(10, 10, 28, .75);
-  color: #dfe6ff; font-size: .75rem; cursor: pointer;
-}
-.visual .tools button[aria-pressed="true"] { background: #2b4a86; border-color: #5b86d6; color: #fff; }
-.visual .hint { position: absolute; right: .7rem; bottom: .5rem; margin: 0; font-size: .68rem; color: #6f7aa3; }
-.visual.frozen .facts, .visual.frozen .hint { display: none; }
-.visual.asleep { padding: .6rem; }
-.visual .again { padding: .45rem .8rem; border-radius: 99px; border: 1px solid #3a4a72; background: #121a33; color: #dfe6ff; cursor: pointer; font-size: .8rem; }
-.visual.frozen:not(.asleep) .tools { left: 50%; bottom: 50%; transform: translate(-50%, 50%); }
-
-@media (max-width: 600px) { /* facts go under the picture instead of over it */
-  .visual-slot { margin-left: 0; }
-  .visual .facts { position: static; width: auto; max-height: none; border-radius: 0; }
-  .visual .hint { display: none; }
-}
-
 /* ---------- quizzes ---------- */
 .rows { list-style: none; margin: 0; padding: 0; }
 .rows li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
