@@ -57,5 +57,17 @@ def health():
 # The web app (dashboard/ folder) is served from the same address as the API, so
 # http://127.0.0.1:8000/ opens it. Mounted last so every API route above wins.
 WEB_DIR = Path(settings.web_dir) if settings.web_dir else Path(__file__).resolve().parents[2] / "dashboard"
+
+
+class WebApp(StaticFiles):
+    """The web app's files, with "check for a newer version first": without it browsers kept old
+    copies after an update (a stale styles.css broke the 3D views). Unchanged files cost a tiny 304."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 if (WEB_DIR / "index.html").is_file():
-    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+    app.mount("/", WebApp(directory=WEB_DIR, html=True), name="web")

@@ -600,13 +600,18 @@ function makeLive(root, visual) {
   const card = buildCard(root, visual);
   W.card = card;
   W.visible = true;
+  // Size and shape set here too, not only in styles.css: with an old cached stylesheet the canvas
+  // and its frame kept resizing each other and grew without limit.
+  Object.assign(card.stage.style, { position: "relative", aspectRatio: "16 / 10", overflow: "hidden" });
+  Object.assign(W.renderer.domElement.style, { display: "block", width: "100%", height: "100%" });
   card.stage.prepend(W.renderer.domElement);
   W.observer?.disconnect();
   W.observer = new IntersectionObserver((entries) => { W.visible = entries.some((e) => e.isIntersecting); });
   W.observer.observe(root);
   W.resize?.disconnect();
   W.resize = new ResizeObserver(() => {
-    const { width, height } = card.stage.getBoundingClientRect();
+    const width = card.stage.getBoundingClientRect().width;
+    const height = Math.round(width * 10 / 16); // from the width only, never from what the canvas did to the frame
     if (!width || !height) return;
     W.renderer.setSize(width, height, false);
     W.camera.aspect = width / height;

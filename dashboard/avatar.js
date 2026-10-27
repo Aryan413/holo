@@ -162,6 +162,9 @@ function mount(element) {
     note(failure);
     return;
   }
+  // Set here too, not only in styles.css, so an old cached stylesheet can't make it grow without limit.
+  Object.assign(renderer.domElement.style, { display: "block", width: "100%", height: "100%" });
+  if (getComputedStyle(stage).position === "static") stage.style.position = "relative";
   stage.prepend(renderer.domElement);
   resizeObserver?.disconnect();
   resizeObserver = new ResizeObserver(resize);
