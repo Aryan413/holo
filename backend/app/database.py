@@ -18,7 +18,12 @@ def engine_options(url: str) -> dict:
         return {"connect_args": {"check_same_thread": False}}
     # A shared cloud database closes idle connections (Neon sleeps after a few minutes):
     # test each one before use and replace it after 5 minutes, instead of failing a request.
-    return {"pool_pre_ping": True, "pool_recycle": 300}
+    options = {"pool_pre_ping": True, "pool_recycle": 300}
+    if "-pooler" in url:
+        # Neon's pooled address (PgBouncer) can't keep the prepared statements psycopg makes
+        # for repeated queries; without this they fail at random under load.
+        options["connect_args"] = {"prepare_threshold": None}
+    return options
 
 
 engine = create_engine(engine_url(settings.database_url), **engine_options(settings.database_url))

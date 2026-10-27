@@ -1,12 +1,18 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+import os
 
-from app.config import settings
-from app.database import Base, get_db
-from app.main import app
+# Tests must never touch a real database, above all the team's shared one named in backend/.env.
+# An environment variable wins over .env, and it has to be set before the app is imported.
+os.environ["DATABASE_URL"] = "sqlite://"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
+
+from app.config import settings  # noqa: E402
+from app.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
 
 TEACHER_CODE = "letmein"
 
