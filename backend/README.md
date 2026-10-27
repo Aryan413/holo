@@ -94,14 +94,45 @@ cd backend
 It refuses if the shared database already has data (so it can't duplicate anything) and leaves test accounts
 (`@example.com`) behind; `--keep-example-accounts` copies those too.
 
-Tables are created automatically on start. With a shared database a table change reaches everyone at once, so table
-changes should get Alembic migrations (see below) before more people rely on it.
+The tables are made by the migrations (next section), and a table change reaches everyone at once.
+
+## Changing the tables (migrations)
+
+Every change to the tables (a new table, a new column, a renamed field) is a **migration**: a small numbered script in
+`migrations/versions/`, made by [Alembic](https://alembic.sqlalchemy.org), committed and reviewed like any code.
+
+**When the server starts** it checks the database against the migrations:
+
+- **Your local database** (`sqlite:///./holox.db`) is brought up to date automatically.
+- **The shared database is never changed automatically.** If it is missing a migration the code needs, the server stops
+  and lists what's missing; if it has migrations your code doesn't (a teammate merged a change), it tells you to
+  `git pull`. This way an unmerged branch can't change the tables under everyone else.
+- A database made before migrations existed is adopted as it is (nothing is recreated).
+
+**To change a table:**
+
+1. Work on your **local** database: in `.env`, `DATABASE_URL=sqlite:///./holox.db`.
+2. Change the model in `app/models.py`.
+3. Generate the migration and **read it** (Alembic guesses; check renames and new non-empty columns):
+   ```powershell
+   .\venv\Scripts\python.exe -m alembic revision --autogenerate -m "add grade to quiz attempts"
+   ```
+4. Restart the server (it applies the migration to your local database) and run the tests. A test fails if a model
+   changed without a migration.
+5. Commit the model change and the new file in `migrations/versions/` together; open a pull request.
+6. **After it is merged into `main`**, one person applies it to the shared database, once:
+   ```powershell
+   .\venv\Scripts\python.exe -m alembic upgrade head
+   ```
+   Everyone else just pulls `main` and restarts.
+
+Useful: `.\venv\Scripts\python.exe -m alembic current` (which version a database is at), `.\venv\Scripts\python.exe -m alembic history` (all migrations).
 
 ## Before deploying
 
 - Set `ENVIRONMENT=production` and a strong `JWT_SECRET` (the server refuses to start in production with the dev secret).
 - Set `TEACHER_SIGNUP_CODE` to something private, and use PostgreSQL (`DATABASE_URL`, see "Shared team database").
-- Add Alembic migrations once the tables start changing. Right now they are created automatically on startup.
+- Apply any pending migrations to the production database (`alembic upgrade head`) as part of each release.
 - Add rate limiting on `/auth/login` and `/tutor/chat`, and serve over HTTPS.
 
 

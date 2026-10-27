@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, func, inspect, select, text
 from app import models  # noqa: F401  (registers the tables on Base.metadata)
 from app.config import settings
 from app.database import Base, engine_options, engine_url
+from app.migrations import prepare_database
 
 
 TEST_DOMAIN = "@example.com"
@@ -31,7 +32,8 @@ def copy_database(source_url: str, target_url: str, skip_test_accounts: bool = T
     source = create_engine(engine_url(source_url), **engine_options(source_url))
     target = create_engine(engine_url(target_url), **engine_options(target_url))
     tables = Base.metadata.sorted_tables
-    Base.metadata.create_all(target)
+    # Build (or check) the tables the way every database gets them: through the migrations.
+    prepare_database(target, target_url, auto_upgrade=True)
 
     with target.connect() as conn:
         filled = [t.name for t in tables if conn.scalar(select(func.count()).select_from(t))]

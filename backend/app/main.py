@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .database import Base, engine
+from .database import engine
+from .migrations import DatabaseOutOfStep, prepare_database
 from .routers import auth, dashboard, quiz, tutor, voice
 
 
@@ -16,8 +17,13 @@ logger = logging.getLogger("uvicorn.error")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Fine for development. Switch to Alembic migrations before the schema starts changing.
-    Base.metadata.create_all(bind=engine)
+    # Tables come from Alembic migrations (backend/migrations). The shared database is only
+    # checked here, never changed: see app/migrations.py.
+    try:
+        logger.info("Database: %s", prepare_database(engine, settings.database_url))
+    except DatabaseOutOfStep as problem:
+        logger.error("The server can't start: %s", problem)
+        raise SystemExit(1) from None
     if settings.llm_provider == "echo":
         logger.warning(
             "LLM_PROVIDER=echo: tutor replies are placeholders. "
