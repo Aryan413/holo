@@ -50,7 +50,7 @@ If a setting is missing the server refuses to start and says which one. If the A
 | POST | `/auth/register` | anyone | Create a student (teachers need `teacher_code`) |
 | POST | `/auth/login` | anyone | Form fields `username` (the email) and `password`; returns a token |
 | GET | `/auth/me` | logged in | Current user |
-| POST | `/tutor/chat` | logged in | Send a question, get the tutor's reply. `language` is `en` or `ml` |
+| POST | `/tutor/chat` | logged in | Send a question, get the tutor's reply. `language` is `en` or `ml`. The reply may carry `visual` (e.g. `{"kind": "solar_system", "view": "planet", "focus": ["mars"]}`, chosen by `app/services/visuals.py`) |
 | GET | `/tutor/sessions` | logged in | Your chat sessions |
 | GET | `/tutor/sessions/{id}` | owner only | One session with all messages |
 | POST | `/quizzes` | teacher | Create a quiz |
