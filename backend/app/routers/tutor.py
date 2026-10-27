@@ -7,11 +7,12 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import ChatMessage, ChatSession, User
-from ..schemas import ChatRequest, ChatResponse, SessionDetail, SessionOut
+from ..schemas import ChatRequest, ChatResponse, MessageOut, SessionDetail, SessionOut
 from ..security import get_current_user
 from ..services.llm import LLMProvider, get_provider
 from ..services.rag import list_subjects, retrieve
 from ..services.tts import warm_up as warm_up_voice
+from ..services.visuals import describe, solar_visual
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,10 @@ def chat(
     system = build_system_prompt(
         session.subject, session.language, retrieve(session.subject, body.message)
     )
+    earlier_questions = [m.content for m in session.messages if m.role == "user"]
+    picture = solar_visual(body.message, earlier_questions)
+    if picture:  # let the answer refer to the 3D view the student will see
+        system += "\n\n" + describe(picture)
 
     warm_up_voice()  # opens the read-aloud voice's connection while the AI writes the answer
     try:
@@ -85,7 +90,9 @@ def chat(
         ]
     )
     db.commit()
-    return ChatResponse(session_id=session.id, reply=reply)
+    # Decided again with the answer, which can name what to highlight ("the largest planet" -> Jupiter).
+    visual = solar_visual(body.message, earlier_questions, reply)
+    return ChatResponse(session_id=session.id, reply=reply, visual=visual)
 
 
 @router.get("/subjects", response_model=list[str])
@@ -107,4 +114,12 @@ def get_session(
     session = db.get(ChatSession, session_id)
     if session is None or session.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
-    return session
+    # Pictures aren't stored: work them out again, so a reopened chat shows them too.
+    messages, questions = [], []
+    for m in session.messages:
+        visual = solar_visual(questions[-1], questions[:-1], m.content) if m.role == "assistant" and questions else None
+        if m.role == "user":
+            questions.append(m.content)
+        messages.append(MessageOut(role=m.role, content=m.content, created_at=m.created_at, visual=visual))
+    return SessionDetail(id=session.id, subject=session.subject, language=session.language,
+                         created_at=session.created_at, messages=messages)

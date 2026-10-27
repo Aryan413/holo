@@ -45,6 +45,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: int
     reply: str
+    # A picture to show with the answer, e.g. {"kind": "solar_system", "view": "planet", "focus": ["mars"]}
+    visual: dict | None = None
 
 
 class MessageOut(BaseModel):
@@ -53,6 +55,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+    visual: dict | None = None  # on the tutor's answers, as in ChatResponse
 
 
 class SessionOut(BaseModel):
