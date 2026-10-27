@@ -2,6 +2,8 @@
 the web app uses the computer's own voices and never calls this."""
 
 import logging
+import threading
+import time
 from typing import Protocol
 
 import httpx
@@ -9,6 +11,39 @@ import httpx
 from ..config import settings
 
 logger = logging.getLogger("uvicorn.error")
+
+
+# One connection to ElevenLabs, kept open between requests. Opening a new secure connection
+# for every piece of an answer added 1-2 s before each one started playing (measured).
+_client: httpx.Client | None = None
+_client_lock = threading.Lock()
+_last_warm_up = 0.0
+
+
+def _http() -> httpx.Client:
+    global _client
+    with _client_lock:
+        if _client is None:
+            _client = httpx.Client(limits=httpx.Limits(keepalive_expiry=300))
+        return _client
+
+
+def warm_up() -> None:
+    """Opens the connection to ElevenLabs in the background while the AI is still writing
+    the answer, so the first spoken sentence doesn't wait for it. Costs no characters."""
+    global _last_warm_up
+    if settings.tts_provider != "elevenlabs" or time.monotonic() - _last_warm_up < 60:
+        return
+    _last_warm_up = time.monotonic()
+
+    def run():
+        try:
+            _http().get("https://api.elevenlabs.io/v1/models",
+                        headers={"xi-api-key": settings.elevenlabs_api_key}, timeout=10)
+        except httpx.HTTPError:
+            pass  # the real request will report any problem
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 class VoiceUnavailable(Exception):
@@ -43,7 +78,7 @@ class ElevenLabsSpeaker:
         if next_text:
             body["next_text"] = next_text
         try:
-            response = httpx.post(
+            response = _http().post(
                 self.URL.format(voice_id=self.voice_id),
                 params={"output_format": "mp3_44100_128"},
                 headers={"xi-api-key": self.api_key, "content-type": "application/json", "accept": "audio/mpeg"},

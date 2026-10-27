@@ -69,10 +69,38 @@ If a setting is missing the server refuses to start and says which one. If the A
 - **Unity avatar / voice:** call `POST /tutor/chat` with the student's token and speak the `reply`. Send `"language": "ml"` for Malayalam.
 - **Dashboard:** read `GET /dashboard/summary` with a teacher token.
 
+## Shared team database
+
+By default each computer keeps its own database file (`holox.db`), so accounts and chats are not shared. To share
+them, the team uses one PostgreSQL database in the cloud (free on [Neon](https://neon.tech)); everyone still runs the
+backend, Ollama and voice on their own computer.
+
+**Everyone:** put the connection string in `backend/.env`, exactly as Neon shows it, then restart the server:
+
+```
+DATABASE_URL=postgresql://user:password@ep-something.aws.neon.tech/neondb?sslmode=require
+```
+
+It contains the password: share it only privately (direct message), never in git, a group chat or a screenshot.
+Delete the line (or set it back to `sqlite:///./holox.db`) to go back to your own local file.
+
+**Once, by whoever creates it:** copy the existing accounts and chats from `holox.db` into it:
+
+```powershell
+cd backend
+.\venv\Scripts\python.exe -m scripts.copy_to_shared_db
+```
+
+It refuses if the shared database already has data (so it can't duplicate anything) and leaves test accounts
+(`@example.com`) behind; `--keep-example-accounts` copies those too.
+
+Tables are created automatically on start. With a shared database a table change reaches everyone at once, so table
+changes should get Alembic migrations (see below) before more people rely on it.
+
 ## Before deploying
 
 - Set `ENVIRONMENT=production` and a strong `JWT_SECRET` (the server refuses to start in production with the dev secret).
-- Set `TEACHER_SIGNUP_CODE` to something private, and move to PostgreSQL (`DATABASE_URL`).
+- Set `TEACHER_SIGNUP_CODE` to something private, and use PostgreSQL (`DATABASE_URL`, see "Shared team database").
 - Add Alembic migrations once the tables start changing. Right now they are created automatically on startup.
 - Add rate limiting on `/auth/login` and `/tutor/chat`, and serve over HTTPS.
 

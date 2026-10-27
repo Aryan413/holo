@@ -11,6 +11,7 @@ from ..schemas import ChatRequest, ChatResponse, SessionDetail, SessionOut
 from ..security import get_current_user
 from ..services.llm import LLMProvider, get_provider
 from ..services.rag import list_subjects, retrieve
+from ..services.tts import warm_up as warm_up_voice
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ def chat(
         session.subject, session.language, retrieve(session.subject, body.message)
     )
 
+    warm_up_voice()  # opens the read-aloud voice's connection while the AI writes the answer
     try:
         reply = llm.generate(system, messages)
     except httpx.HTTPError as exc:
