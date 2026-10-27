@@ -69,6 +69,7 @@ holo/
 - The sign-in token lives in `sessionStorage`. System fonts only, so it works offline.
 - Voice: the Speak button records with `MediaRecorder` and posts to `/voice/transcribe`; spoken answers use the browser's `speechSynthesis` (no server), read sentence by sentence so Pause/Resume work, and are on by default. A speech failure must never discard a received answer.
 - Tutor character: `avatar.js` draws `models/tutor.vrm` (a VRM model, Git LFS) beside the chat, with lip sync (audio analysis for ElevenLabs, word timings for the browser voice) and expressions by state. `app.js` only dispatches `mentora:avatar` events (`avatarCue()`); the character must never be able to break the chat.
+- Visuals with answers: `/tutor/chat` (and reopened sessions) return `visual` when a question is about the solar system; `app/services/visuals.py` picks the view (overview, planet, compare, sizes, orbits) from the question with keyword rules (English and Malayalam, follow-ups), the answer only choosing what to highlight. `dashboard/visuals/solar.js` draws it under the answer (facts from NASA's fact sheet in `FACTS`, procedural surfaces, one live WebGL view). `app.js` dispatches `mentora:visual`; new kinds of visual follow the same pattern.
 
 ### `avatar-unity/`
 

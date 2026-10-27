@@ -300,12 +300,36 @@ function viewTutor(main) {
   loadSessions();
 }
 
+// A picture with an answer (e.g. the 3D solar system), drawn by its own module in visuals/.
+// The element is kept on the turn so repainting the chat doesn't rebuild it.
+let pendingVisuals = [];
+
+function visualEl(turn) {
+  if (!turn.visual) return null;
+  if (!turn.visualEl) {
+    turn.visualEl = h("figure", { class: "visual-slot" });
+    pendingVisuals.push(turn);
+  }
+  return turn.visualEl;
+}
+
+function mountVisuals(chat) {
+  const newest = [...chat.turns].reverse().find((t) => t.visual);
+  for (const turn of pendingVisuals) {
+    if (!turn.visualEl.isConnected) continue;
+    window.dispatchEvent(new CustomEvent("mentora:visual", {
+      detail: { type: "mount", element: turn.visualEl, visual: turn.visual, live: turn === newest },
+    }));
+  }
+  pendingVisuals = [];
+}
+
 function turnEl(turn) {
   const body = h("div", { class: "body" }, turn.pending ? h("span", { class: "thinking" }, "Thinking…") : turn.text);
   const canListen = turn.who === "tutor" && !turn.pending && canSpeak();
   return h("article", { class: `turn ${turn.who}` },
     h("div", { class: "who-label" }, turn.who === "you" ? "You" : "Mentora"),
-    h("div", { class: "col" }, body, canListen && listenButton(turn.text)),
+    h("div", { class: "col" }, body, canListen && listenButton(turn.text), visualEl(turn)),
   );
 }
 
@@ -318,6 +342,7 @@ function paintTutor() {
   }
   if (chat.error) nodes.push(errorBox(chat.error));
   ui.transcript.replaceChildren(...nodes);
+  mountVisuals(chat);
   // Show the end of the conversation, but never scroll the question out of view
   // when the answer is longer than the window: start reading at the question.
   const tr = ui.transcript;
@@ -374,7 +399,7 @@ async function openSession(id) {
     const session = await api(`/tutor/sessions/${id}`);
     state.chat = {
       id: session.id, subject: session.subject, language: session.language, busy: false, error: "",
-      turns: session.messages.map((m) => ({ who: m.role === "user" ? "you" : "tutor", text: m.content })),
+      turns: session.messages.map((m) => ({ who: m.role === "user" ? "you" : "tutor", text: m.content, visual: m.visual })),
     };
     paintTutor();
   } catch (problem) {
@@ -397,7 +422,7 @@ async function ask(text) {
       json: { message: text, subject: chat.subject, language: chat.language, session_id: chat.id },
     });
     chat.id = reply.session_id;
-    chat.turns[chat.turns.length - 1] = { who: "tutor", text: reply.reply };
+    chat.turns[chat.turns.length - 1] = { who: "tutor", text: reply.reply, visual: reply.visual };
     avatarCue("answer", { text: reply.reply });
     loadSessions();
     if (voice.readAloud && state.chat === chat && state.view === "tutor") {

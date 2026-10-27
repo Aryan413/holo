@@ -30,7 +30,12 @@ def test_api_routes_still_win_over_the_web_app(client):
 def test_tutor_character_files_are_served(client):
     page = client.get("/").text
     assert "avatar.js" in page and "importmap" in page
-    for path in ("/avatar.js", "/vendor/three/three.module.min.js", "/vendor/three/three.core.min.js",
+    for path in ("/avatar.js", "/visuals/solar.js", "/vendor/three/three.module.min.js", "/vendor/three/three.core.min.js",
                  "/vendor/three/addons/loaders/GLTFLoader.js", "/vendor/three-vrm/three-vrm.module.min.js",
                  "/models/tutor.vrm"):
         assert client.get(path).status_code == 200, path
+
+
+def test_browsers_always_check_for_a_newer_web_app(client):
+    for path in ("/", "/app.js", "/styles.css", "/visuals/solar.js"):
+        assert client.get(path).headers["cache-control"] == "no-cache", path

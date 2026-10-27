@@ -45,12 +45,32 @@ A 3D character (`avatar.js`, drawn with three.js and three-vrm) stands beside th
   tablets, above the chat on phones. With "reduce motion" on, it keeps still apart from the lips.
 - `app.js` only announces what is happening (`mentora:avatar` events on `window`); if 3D fails, the chat is unaffected.
 
+## Solar system views
+
+When a question is about the Sun, the planets, their moons or orbits, a 3D solar system appears under the answer
+(`visuals/solar.js`), in the view that fits the question. The backend picks it (`backend/app/services/visuals.py`):
+
+| Question | View |
+|---|---|
+| "What is the solar system?", "How many planets are there?" | **Whole system**, planets moving at their real relative speeds |
+| "Tell me about Mars", "Saturn's rings", "What is the Sun made of?" | **Close-up** with its biggest moons and a fact card |
+| "Compare Earth and Mars", "Is Venus bigger than Earth?" | **Side by side** at true relative sizes, with a table |
+| "Which is the largest planet?" | **All eight planets at true size**, the answer's planet highlighted |
+| "How long is a year on Neptune?", "Which planet is closest to the Sun?" | **Orbits from above**, that orbit highlighted |
+
+Follow-ups ("How many moons does it have?") keep the planet, and Malayalam planet names work too. The planet the tutor is
+talking about lights up while the answer is read aloud. Students can drag to turn, scroll to zoom and click a planet.
+Facts come from NASA's planetary fact sheet (`FACTS` in `solar.js`), not from the AI; surfaces are drawn by code, so
+there are no image files. Only the newest answer's view is live 3D; older ones keep a still picture
+("Show in 3D again"). `app.js` only dispatches `mentora:visual` events, so a failure here can't break the chat.
+
 ## Files
 
 - `index.html` – the page shell
 - `styles.css` – look and feel (dark by default, follows the computer's light setting)
 - `app.js` – sign-in, tutor, quizzes, teacher screens; talks to the backend API
 - `avatar.js` – the 3D tutor character beside the chat (see below)
+- `visuals/solar.js` – the 3D solar system shown with answers about space (see above)
 - `models/tutor.vrm` – the character (Git LFS); `models/README.md` says how to swap it and credits it
 - `vendor/` – local copies of three.js and three-vrm, loaded through the import map in `index.html`
 
