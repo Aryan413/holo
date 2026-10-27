@@ -1,1 +1,1 @@
-Generic single-database configuration.
+Database migrations (Alembic). How to make and apply them: see backend/README.md, "Changing the tables".
